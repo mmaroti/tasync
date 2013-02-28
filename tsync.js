@@ -13,9 +13,11 @@ define(function () {
 		}
 	}
 
-	// ------- Exception -------
+	// ------- FutureError -------
 
-	function Exception (future, error) {
+	function FutureError (future, error) {
+		assert(future instanceof Future && error instanceof Error);
+
 		this.original = error;
 		this.message = error.message;
 		this.stack = error.stack + "\n" + getTrace(future);
@@ -26,7 +28,7 @@ define(function () {
 	function getPath (future) {
 		var path = [];
 		while (future !== ROOT) {
-			path.push(future.index);
+			path.push(future.position);
 			future = future.caller;
 		}
 		return path;
@@ -67,7 +69,7 @@ define(function () {
 		this.listeners = [];
 
 		this.caller = current;
-		this.index = ++current.children;
+		this.position = ++current.children;
 		this.children = 0;
 
 		this.trace = new Error();
@@ -88,32 +90,41 @@ define(function () {
 		future.value = value;
 		future.listeners = null;
 
-		for (i = 0; i < listeners.length; i += 4) {
+		for (i = 0; i < listeners.length; i += 2) {
 			try {
-				listeners[i](value, listeners[i + 1], listeners[i + 2], listeners[i + 3]);
+				listeners[i](listeners[i + 1], value);
 			} catch (err) {
-				console.log("tsync listener error ignored", err);
+				console.log("tsync listener error ignored", err.stack);
 			}
 		}
 	}
 
-	function addListener (future, func, arg1, arg2, arg3) {
+	function addListener (future, func, arg) {
 		assert(future.value === UNRESOLVED);
 
-		future.listeners.push(func, arg1, arg2, arg3);
+		future.listeners.push(func, arg);
 	}
 
 	// ------- lift -------
+
+	function FutureArray (array, index) {
+		Future.apply(this);
+
+		this.array = array;
+		this.index = index;
+	}
+
+	FutureArray.prototype = Object.create(Future.prototype);
 
 	function liftArray (array) {
 		var index;
 		for (index = 0; index < array.length; ++index) {
 			if (array[index] instanceof Future) {
 				if (array[index].value === UNRESOLVED) {
-					var future = new Future();
-					addListener(array[index], setArrayMember, future, array, index);
+					var future = new FutureArray(array, index);
+					addListener(array[index], setArrayMember, future);
 					return future;
-				} else if (array[index].value instanceof Exception) {
+				} else if (array[index].value instanceof FutureError) {
 					throw array[index].value;
 				} else {
 					array[index] = array[index].value;
@@ -123,27 +134,29 @@ define(function () {
 		return array;
 	}
 
-	function setArrayMember (value, future, array, index) {
-		if (value instanceof Exception) {
+	function setArrayMember (future, value) {
+		assert(future instanceof FutureArray);
+
+		if (value instanceof FutureError) {
 			setValue(future, value);
 		} else {
-			array[index] = value;
+			future.array[future.index] = value;
 
-			while (++index < array.length) {
-				if (array[index] instanceof Future) {
-					if (array[index].value === UNRESOLVED) {
-						addListener(array[index], setArrayMember, future, array, index);
+			while (++future.index < future.array.length) {
+				if (future.array[future.index] instanceof Future) {
+					if (future.array[future.index].value === UNRESOLVED) {
+						addListener(future.array[future.index], setArrayMember, future);
 						return;
-					} else if (array[index].value instanceof Exception) {
-						setValue(array[index].value);
+					} else if (future.array[future.index].value instanceof FutureError) {
+						setValue(future.array[future.index].value);
 						return;
 					} else {
-						array[index] = array[index].value;
+						future.array[future.index] = future.array[future.index].value;
 					}
 				}
 			}
 
-			setValue(future, array);
+			setValue(future, future.array);
 		}
 	}
 
@@ -155,7 +168,7 @@ define(function () {
 		if (value instanceof Future) {
 			if (value.value === UNRESOLVED) {
 				addListener(value, notify, func);
-			} else if (value.value instanceof Exception) {
+			} else if (value.value instanceof FutureError) {
 				func(value.value);
 			} else {
 				func(null, value.value);
@@ -165,12 +178,74 @@ define(function () {
 		}
 	}
 
-	function notify (result, func) {
-		if (result instanceof Exception) {
+	function notify (func, result) {
+		if (result instanceof FutureError) {
 			func(result);
 		} else {
 			func(null, result);
 		}
+	}
+
+	// ------- napply -------
+
+	function FutureCall (func, obj) {
+		Future.apply(this);
+
+		this.func = func;
+		this.obj = obj;
+	}
+
+	FutureCall.prototype = Object.create(Future.prototype);
+
+	function napply (func, obj, args) {
+		assert(typeof func === "function");
+
+		var future;
+
+		args = liftArray(args);
+		args.push(function (err, value) {
+			if (err) {
+				err = err instanceof Error ? err : new Error(err);
+				value = err instanceof FutureError ? err : new FutureError(future, err);
+			}
+			setValue(future, value);
+		});
+
+		if (args instanceof Future) {
+			future = new FutureCall(func, obj);
+			addListener(args, makeCall, future);
+			return future;
+		} else {
+			future = new Future();
+
+			current = future;
+			try {
+				func.apply(obj, args);
+			} finally {
+				current = future.caller;
+			}
+
+			if (future.value === UNRESOLVED) {
+				return future;
+			} else if (future.value instanceof FutureError) {
+				throw future.value;
+			} else {
+				return future.value;
+			}
+		}
+	}
+
+	function makeCall (future, args) {
+		var old = current;
+		current = future;
+		try {
+			future.func.apply(future.obj, args);
+		} catch (err) {
+			var error = err instanceof Error ? err : new Error(err);
+			error = error instanceof FutureError ? error : new FutureError(future, error);
+			setValue(future, error);
+		}
+		current = old;
 	}
 
 	// ------- TSYNC -------
@@ -180,6 +255,7 @@ define(function () {
 		getTrace: getTrace,
 		setValue: setValue,
 		lift: liftArray,
-		then: then
+		then: then,
+		napply: napply
 	};
 });

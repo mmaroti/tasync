@@ -8,9 +8,10 @@ requirejs([ "tsync" ], function (TSYNC) {
 	"use strict";
 
 	var future = new TSYNC.Future();
-	var array = [future, 2, future]; 
+	var array = TSYNC.lift([future, 2, future]);
+	console.log(array instanceof TSYNC.Future);
 	
-	TSYNC.then(TSYNC.lift(array), function (err, value) {
+	TSYNC.then(array, function (err, value) {
 		console.log(err, value);
 	});
 	
