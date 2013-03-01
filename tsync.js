@@ -16,7 +16,9 @@ define(function () {
 	// ------- FutureError -------
 
 	function FutureError (future, error) {
-		assert(future instanceof Future && error instanceof Error);
+		assert(future instanceof Future);
+
+		error = error instanceof Error ? error : new Error(error);
 
 		this.original = error;
 		this.message = error.message;
@@ -24,6 +26,8 @@ define(function () {
 
 		console.log("tsync future error", getPath(future));
 	}
+
+	FutureError.prototype = Object.create(Error.prototype);
 
 	function getPath (future) {
 		var path = [];
@@ -205,8 +209,7 @@ define(function () {
 		args = liftArray(args);
 		args.push(function (err, value) {
 			if (err) {
-				err = err instanceof Error ? err : new Error(err);
-				value = err instanceof FutureError ? err : new FutureError(future, err);
+				value = new FutureError(future, err);
 			}
 			setValue(future, value);
 		});
@@ -241,9 +244,7 @@ define(function () {
 		try {
 			future.func.apply(future.obj, args);
 		} catch (err) {
-			var error = err instanceof Error ? err : new Error(err);
-			error = error instanceof FutureError ? error : new FutureError(future, error);
-			setValue(future, error);
+			setValue(future, new FutureError(future, err));
 		}
 		current = old;
 	}
