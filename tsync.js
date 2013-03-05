@@ -183,10 +183,14 @@ define(function () {
 	}
 
 	function notify (func, result) {
-		if (result instanceof FutureError) {
-			func(result);
-		} else {
-			func(null, result);
+		try {
+			if (result instanceof FutureError) {
+				func(result);
+			} else {
+				func(null, result);
+			}
+		} catch (err) {
+			console.log("tsync uncaught exception", err instanceof Error ? err.stack : err);
 		}
 	}
 
@@ -206,13 +210,14 @@ define(function () {
 
 		var future;
 
-		args = liftArray(args);
 		args.push(function (err, value) {
+			console.log(getPath(future), "qqqqqq", arguments);
 			if (err) {
 				value = new FutureError(future, err);
 			}
 			setValue(future, value);
 		});
+		args = liftArray(args);
 
 		if (args instanceof Future) {
 			future = new FutureCall(func, obj);
@@ -239,7 +244,7 @@ define(function () {
 	}
 
 	function makeCall (future, args) {
-		var old = current;
+		var value, old = current;
 		current = future;
 		try {
 			future.func.apply(future.obj, args);
