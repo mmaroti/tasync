@@ -262,7 +262,7 @@ define(function () {
 		return future;
 	}
 
-	// ------- wrap -------
+	// ------- apply -------
 
 	function FutureApply (func, that, args, index) {
 		Future.apply(this);
@@ -322,27 +322,25 @@ define(function () {
 		}
 	}
 
-	function wrap (func) {
-		assert(typeof func === "function");
+	function apply_trace_end (func, args, that) {
+		assert(typeof func === "function" && args instanceof Array);
 
-		return function wrapped_trace_end() {
-			var index;
-			for (index = 0; index < arguments.length; ++index) {
-				if (arguments[index] instanceof Future) {
-					if (arguments[index].value === UNRESOLVED) {
-						var future = new FutureApply(func, this, arguments, index);
-						addListener(arguments[index], setArgument_trace_start, future);
-						return future;
-					} else if (arguments[index].value instanceof FutureError) {
-						throw arguments[index].value;
-					} else {
-						arguments[index] = arguments[index].value;
-					}
+		var index;
+		for (index = 0; index < args.length; ++index) {
+			if (args[index] instanceof Future) {
+				if (args[index].value === UNRESOLVED) {
+					var future = new FutureApply(func, that, args, index);
+					addListener(args[index], setArgument_trace_start, future);
+					return future;
+				} else if (args[index].value instanceof FutureError) {
+					throw args[index].value;
+				} else {
+					args[index] = arguments[index].value;
 				}
 			}
+		}
 
-			return func.apply(this, arguments);
-		};
+		return func.apply(that, args);
 	}
 
 	// ------- TSYNC -------
@@ -355,6 +353,6 @@ define(function () {
 		then: then,
 		napply: napply,
 		delay: delay,
-		wrap: wrap
+		apply: apply_trace_end
 	};
 });

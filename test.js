@@ -33,16 +33,16 @@ requirejs([ "tsync" ], function (TSYNC) {
 		var a = TSYNC.delay(1000, 1);
 		var b = TSYNC.delay(500, 0);
 
-		var f1 = TSYNC.wrap(function (x, y) {
-			if( y === 0 ) {
+		function divide (x, y) {
+			if (y === 0) {
 				throw new Error("divide by zero");
 			}
 
 			return x / y;
-		});
+		}
 
-		var c = f1(2, b);
-		var d = f1(c, 1);
+		var c = TSYNC.apply(divide, [ 2, b ]);
+		var d = TSYNC.apply(divide, [ c, 1 ]);
 
 		TSYNC.then(d, function (err, value) {
 			console.log(err && err.stack);
