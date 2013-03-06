@@ -22,7 +22,7 @@ define(function () {
 
 		this.original = error;
 		this.message = error.message;
-		this.stack = error.stack + "\n" + getTrace(future);
+		this.stack = getSlice(error.stack) + "\n" + getTrace(future);
 
 		console.log("tsync future error", getPath(future));
 	}
@@ -39,15 +39,14 @@ define(function () {
 	}
 
 	function getSlice (trace) {
-		var end = trace.indexOf("_trace_end");
+		var end = trace.indexOf("_trace_start");
 		if (end >= 0) {
 			end = trace.lastIndexOf("\n", end);
-			end = trace.lastIndexOf("\n", end - 1) + 1;
 		} else {
 			end = undefined;
 		}
 
-		var start = trace.indexOf("_trace_start");
+		var start = trace.indexOf("_trace_end");
 		start = trace.indexOf("\n", start) + 1;
 
 		return trace.substring(start, end);
@@ -56,7 +55,7 @@ define(function () {
 	function getTrace (future) {
 		var trace = "";
 		while (future !== ROOT) {
-			trace += "*** tsync ***\n";
+			trace += "*** tasync ***\n";
 			trace += getSlice(future.trace.stack);
 			future = future.caller;
 		}
@@ -87,7 +86,7 @@ define(function () {
 
 	function setValue (future, value) {
 		assert(future.value === UNRESOLVED);
-		console.log("tsync future setvalue", getPath(future), value);
+		console.log("tsync future setvalue", getPath(future), value instanceof Error ? "Error: " + value.message : value);
 
 		var i, listeners = future.listeners;
 
@@ -211,7 +210,6 @@ define(function () {
 		var future;
 
 		args.push(function (err, value) {
-			console.log(getPath(future), "qqqqqq", arguments);
 			if (err) {
 				value = new FutureError(future, err);
 			}
@@ -254,6 +252,99 @@ define(function () {
 		current = old;
 	}
 
+	// ------- delay -------
+
+	function delay (timeout, value) {
+		var future = new Future();
+		setTimeout(function () {
+			setValue(future, value);
+		}, timeout);
+		return future;
+	}
+
+	// ------- wrap -------
+
+	function FutureApply (func, that, args, index) {
+		Future.apply(this);
+
+		this.func = func;
+		this.that = that;
+		this.args = args;
+		this.index = index;
+	}
+
+	FutureApply.prototype = Object.create(Future.prototype);
+
+	function setArgument_trace_start (future, value) {
+		assert(future instanceof FutureApply);
+
+		if (value instanceof FutureError) {
+			setValue(future, value);
+		} else {
+			var args = future.args;
+			args[future.index] = value;
+
+			while (++future.index < args.length) {
+				if (args[future.index] instanceof Future) {
+					if (args[future.index].value === UNRESOLVED) {
+						addListener(args[future.index], setArgument_trace_start, future);
+						return;
+					} else if (args[future.index].value instanceof FutureError) {
+						setValue(args[future.index].value);
+						return;
+					} else {
+						args[future.index] = args[future.index].value;
+					}
+				}
+			}
+
+			assert(current === ROOT);
+			current = future;
+
+			try {
+				value = future.func.apply(future.that, args);
+			} catch (err) {
+				value = new FutureError(future, err);
+			}
+
+			current = ROOT;
+
+			if (value instanceof Future) {
+				if (value.value === UNRESOLVED) {
+					addListener(value, setValue, future);
+					return;
+				} else {
+					value = value.value;
+				}
+			}
+
+			setValue(future, value);
+		}
+	}
+
+	function wrap (func) {
+		assert(typeof func === "function");
+
+		return function wrapped_trace_end() {
+			var index;
+			for (index = 0; index < arguments.length; ++index) {
+				if (arguments[index] instanceof Future) {
+					if (arguments[index].value === UNRESOLVED) {
+						var future = new FutureApply(func, this, arguments, index);
+						addListener(arguments[index], setArgument_trace_start, future);
+						return future;
+					} else if (arguments[index].value instanceof FutureError) {
+						throw arguments[index].value;
+					} else {
+						arguments[index] = arguments[index].value;
+					}
+				}
+			}
+
+			return func.apply(this, arguments);
+		};
+	}
+
 	// ------- TSYNC -------
 
 	return {
@@ -262,6 +353,8 @@ define(function () {
 		setValue: setValue,
 		lift: liftArray,
 		then: then,
-		napply: napply
+		napply: napply,
+		delay: delay,
+		wrap: wrap
 	};
 });
