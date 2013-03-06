@@ -41,8 +41,8 @@ requirejs([ "tasync" ], function (TASYNC) {
 			return x / y;
 		}
 
-		var c = TASYNC.apply(divide, [ 2, b ]);
-		var d = TASYNC.apply(divide, [ c, 1 ]);
+		var c = TASYNC.invoke(divide, [ 2, b ]);
+		var d = TASYNC.invoke(divide, [ c, 1 ]);
 
 		TASYNC.then(d, function (err, value) {
 			console.log(err && err.stack);

@@ -322,7 +322,7 @@ define(function () {
 		}
 	}
 
-	function apply_trace_end (func, args, that) {
+	function invoke_trace_end (func, args, that) {
 		assert(typeof func === "function" && args instanceof Array);
 
 		var index;
@@ -335,7 +335,7 @@ define(function () {
 				} else if (args[index].value instanceof FutureError) {
 					throw args[index].value;
 				} else {
-					args[index] = arguments[index].value;
+					args[index] = args[index].value;
 				}
 			}
 		}
@@ -353,6 +353,6 @@ define(function () {
 		then: then,
 		napply: napply,
 		delay: delay,
-		apply: apply_trace_end
+		invoke: invoke_trace_end
 	};
 });
