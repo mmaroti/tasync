@@ -9,7 +9,7 @@ define(function () {
 
 	function assert (cond) {
 		if (!cond) {
-			throw new Error("tsync internal error");
+			throw new Error("tasync internal error");
 		}
 	}
 
@@ -24,7 +24,7 @@ define(function () {
 		this.message = error.message;
 		this.stack = getSlice(error.stack) + "\n" + getTrace(future);
 
-		console.log("tsync future error", getPath(future));
+		console.log("tasync future error", getPath(future));
 	}
 
 	FutureError.prototype = Object.create(Error.prototype);
@@ -76,7 +76,7 @@ define(function () {
 		this.children = 0;
 
 		this.trace = new Error();
-		console.log("tsync future created", getPath(this));
+		console.log("tasync future created", getPath(this));
 	}
 
 	var ROOT = Object.create(Future.prototype);
@@ -86,7 +86,7 @@ define(function () {
 
 	function setValue (future, value) {
 		assert(future.value === UNRESOLVED);
-		console.log("tsync future setvalue", getPath(future), value instanceof Error ? "Error: " + value.message : value);
+		console.log("tasync future setvalue", getPath(future), value instanceof Error ? "Error: " + value.message : value);
 
 		var i, listeners = future.listeners;
 
@@ -97,7 +97,7 @@ define(function () {
 			try {
 				listeners[i](listeners[i + 1], value);
 			} catch (err) {
-				console.log("tsync listener error ignored", err.stack);
+				console.log("tasync listener error ignored", err.stack);
 			}
 		}
 	}
@@ -189,7 +189,7 @@ define(function () {
 				func(null, result);
 			}
 		} catch (err) {
-			console.log("tsync uncaught exception", err instanceof Error ? err.stack : err);
+			console.log("tasync uncaught exception", err instanceof Error ? err.stack : err);
 		}
 	}
 
@@ -343,7 +343,7 @@ define(function () {
 		return func.apply(that, args);
 	}
 
-	// ------- TSYNC -------
+	// ------- TASYNC -------
 
 	return {
 		Future: Future,
