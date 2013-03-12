@@ -18,7 +18,6 @@ define(function () {
 	var STATE_LISTEN = 0;
 	var STATE_ERROR = 1;
 	var STATE_VALUE = 2;
-	var STATE_FORWARD = 3;
 
 	var Future = function Future_trace_end () {
 		this.state = STATE_LISTEN;
@@ -32,37 +31,32 @@ define(function () {
 		console.log("tasync future", this.getPath());
 	};
 
+	function getValue (value) {
+		while (value instanceof Future) {
+			if (value.state === STATE_LISTEN) {
+				return value;
+			} else if (value.state === STATE_VALUE) {
+				value = value.value;
+			} else {
+				throw value.value;
+			}
+		}
+		return value;
+	}
+
 	function setValue (future, value) {
 		assert(future instanceof Future && future.state === STATE_LISTEN);
 
-		if (value instanceof Future) {
-			for (;;) {
-
-			}
-		}
-		while (value instanceof Future) {
-			if (value.state === STATE_LISTEN) {
-				addListener(value, setValue, future);
-				return;
-			} else if (value.state === STATE_ERROR) {
-				setError(future, value.value);
-				return;
-			} else {
-				value = value.value;
-			}
-		}
-
 		console.log("tasync setvalue", getPath(future), value);
 
-		if (future.state === STATE_LISTEN) {
-			var i, listeners = future.value;
+		var i, listener, listeners = future.value;
 
-			future.state = STATE_VALUE;
-			future.value = value;
+		future.state = STATE_VALUE;
+		future.value = value;
 
-			for (i = 0; i < listeners.length; ++i) {
-				listeners[i].setValue(value);
-			}
+		for (i = 0; i < listeners.length; ++i) {
+			listener = listeners[i];
+			listener.setValue(value);
 		}
 	}
 
@@ -112,26 +106,26 @@ define(function () {
 	}
 
 	function setError (future, error) {
-		assert(this.state === STATE_LISTEN);
+		assert(future.state === STATE_LISTEN);
 
 		if (!(error instanceof Error) || typeof error.trace !== "string") {
-			error.trace = getTrace(this, error);
+			error.trace = getTrace(future, error);
 		}
 
-		console.log("tasync seterror", this.getPath(), error.message);
+		console.log("tasync seterror", future.getPath(), error.message);
 
-		if (this.state === STATE_LISTEN) {
-			var i, listeners = this.value;
+		if (future.state === STATE_LISTEN) {
+			var i, listener, listeners = future.value;
 
-			this.state = STATE_ERROR;
-			this.value = error;
+			future.state = STATE_ERROR;
+			future.value = error;
 
 			for (i = 0; i < listeners.length; ++i) {
-				listeners[i].setError(error);
+				listener = listeners[i];
+				listener.setError(error);
 			}
 		}
 	}
-	;
 
 	var ROOT = Object.create(Future.prototype);
 	ROOT.children = 0;
@@ -156,9 +150,7 @@ define(function () {
 			return value;
 		}
 		var future = new Future();
-		setTimeout(function () {
-			future.setValue(value);
-		}, timeout);
+		setTimeout(setValue, timeout, future, value);
 		return future;
 	}
 
@@ -181,17 +173,36 @@ define(function () {
 		var args = future.args;
 		args[future.index] = value;
 
-		while (++future.index < args.length) {
-			var arg
-			if (args[future.index] instanceof Future) {
-				if (args[future.index].value === UNRESOLVED) {
-					addListener(args[future.index], setArgument_trace_start, future);
+		do {
+			while (args[future.index] instanceof Future) {
+				value = args[future.index];
+				if (value.state === STATE_VALUE) {
+					args[future.index] = value.value;
+					continue;
+				}
+				if (value.state === STATE_LISTEN) {
+					addListener(value, setArgument_trace_start, future);
 					return;
-				} else if (args[future.index].value instanceof FutureError) {
-					setValue(args[future.index].value);
+				} else if (value.state === STATE_ERROR) {
+					setError(future, value.value);
+					return;
+				}
+			}
+		} while (++future.index < args.length);
+
+		while (future.index < args.length) {
+			var arg = args[future.index];
+			while (arg instanceof Future) {
+				if (arg.value === STATE_LISTEN) {
+					addListener(arg, setArgument_trace_start, future);
+					return;
+				} else if (arg.state === STATE_VALUE) {
+					arg = arg.value;
+				} else if (arg.state === STATE_ERROR) {
+					setError(future, arg.value);
 					return;
 				} else {
-					args[future.index] = args[future.index].value;
+					args[future.index] = arg.value;
 				}
 			}
 		}
@@ -225,17 +236,19 @@ define(function () {
 		var index;
 		for (index = 0; index < args.length; ++index) {
 			var arg = args[index];
-			if (arg instanceof Future) {
-				if (arg.state === STATE_LISTEN) {
+			while (arg instanceof Future) {
+				if (arg.state === STATE_VALUE) {
+					arg = arg.value;
+				} else if (arg.state === STATE_LISTEN) {
+					args[index] = arg;
 					var future = new FutureInvoke(func, that, args, index);
-					arg.addListener(future);
+					arg.addListener(setArgument_trace_start, future);
 					return future;
-				} else if (arg.state === STATE_ERROR) {
-					throw arg.value;
 				} else {
-					args[index] = arg.value;
+					throw arg.value;
 				}
 			}
+			args[index] = arg;
 		}
 
 		return func.apply(that, args);
