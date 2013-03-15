@@ -31,46 +31,73 @@ define(function () {
 		console.log("tasync future", this.getPath());
 	};
 
-	function getValue (value) {
-		while (value instanceof Future) {
-			if (value.state === STATE_LISTEN) {
-				return value;
-			} else if (value.state === STATE_VALUE) {
-				value = value.value;
-			} else {
-				throw value.value;
+	Future.prototype.addListener = function (target) {
+		assert(this.state === STATE_LISTEN);
+		assert(target instanceof Future && target.state === STATE_LISTEN);
+
+		this.value.push(target);
+	};
+
+	Future.prototype.setValue = function (value) {
+		assert(this.state === STATE_LISTEN);
+		assert(!(value instanceof Future) || value.state === STATE_LISTEN);
+
+		console.log("tasync setvalue", this.getPath(), value);
+
+		var listeners = this.value;
+
+		this.state = STATE_VALUE;
+		this.value = value;
+
+		var i = listeners.length;
+		while (--i >= 0) {
+			var listener = listeners[i];
+			listener.receiveValue(value);
+		}
+	};
+
+	Future.prototype.setError = function (error) {
+		assert(this.state === STATE_LISTEN);
+
+		if (!(error instanceof Error)) {
+			error = new Error(error);
+		}
+
+		if (typeof error.trace !== "string") {
+			var trace = getSlice(error.stack) + "\n";
+
+			var future = this;
+			while (future !== ROOT) {
+				trace += "*** tasync ***\n";
+				trace += getSlice(future.trace.stack);
+				future = future.caller;
 			}
+
+			error.trace = trace;
 		}
-		return value;
-	}
 
-	function setValue (future, value) {
-		assert(future instanceof Future && future.state === STATE_LISTEN);
+		console.log("tasync seterror", this.getPath(), error.message);
 
-		console.log("tasync setvalue", getPath(future), value);
+		var listeners = this.value;
 
-		var i, listener, listeners = future.value;
+		this.state = STATE_ERROR;
+		this.value = error;
 
-		future.state = STATE_VALUE;
-		future.value = value;
-
-		for (i = 0; i < listeners.length; ++i) {
-			listener = listeners[i];
-			listener.setValue(value);
+		var i = listeners.length;
+		while (--i >= 0) {
+			var listener = listeners[i];
+			listener.receiveError(error);
 		}
-	}
+	};
 
-	function addListener (future, target) {
-		assert(future instanceof Future && target instanceof Future);
-
-		if (future.state === STATE_LISTEN) {
-			future.value.push(target);
-		} else if (future.state === STATE_VALUE) {
-			setValue(target, future.value);
-		} else {
-			setError(target, future.value);
+	Future.prototype.getPath = function () {
+		var future = this, path = [];
+		while (future !== ROOT) {
+			path.push(future.position);
+			future = future.caller;
 		}
-	}
+		return path;
+	};
 
 	function getSlice (trace) {
 		assert(typeof trace === "string");
@@ -88,60 +115,10 @@ define(function () {
 		return trace.substring(start, end);
 	}
 
-	function getTrace (future, error) {
-		assert(future instanceof Future);
-
-		if (!(error instanceof Error)) {
-			error = new Error(error);
-		}
-
-		var trace = getSlice(error.stack) + "\n";
-		while (future !== ROOT) {
-			trace += "*** tasync ***\n";
-			trace += getSlice(future.trace.stack);
-			future = future.caller;
-		}
-
-		return trace;
-	}
-
-	function setError (future, error) {
-		assert(future.state === STATE_LISTEN);
-
-		if (!(error instanceof Error) || typeof error.trace !== "string") {
-			error.trace = getTrace(future, error);
-		}
-
-		console.log("tasync seterror", future.getPath(), error.message);
-
-		if (future.state === STATE_LISTEN) {
-			var i, listener, listeners = future.value;
-
-			future.state = STATE_ERROR;
-			future.value = error;
-
-			for (i = 0; i < listeners.length; ++i) {
-				listener = listeners[i];
-				listener.setError(error);
-			}
-		}
-	}
-
 	var ROOT = Object.create(Future.prototype);
 	ROOT.children = 0;
 
 	var current = ROOT;
-
-	function getPath (future) {
-		assert(future instanceof Future);
-
-		var path = [];
-		while (future !== ROOT) {
-			path.push(future.position);
-			future = future.caller;
-		}
-		return path;
-	}
 
 	// ------- delay -------
 
@@ -150,7 +127,9 @@ define(function () {
 			return value;
 		}
 		var future = new Future();
-		setTimeout(setValue, timeout, future, value);
+		setTimeout(function () {
+			future.setValue(value);
+		}, timeout);
 		return future;
 	}
 
@@ -167,98 +146,83 @@ define(function () {
 
 	FutureInvoke.prototype = Object.create(Future.prototype);
 
-	function setArgument_trace_start (future, value) {
-		assert(future instanceof FutureInvoke);
+	FutureInvoke.prototype.receiveValue = function (value) {
+		assert(!(value instanceof Future));
 
-		var args = future.args;
-		args[future.index] = value;
+		var args = this.args;
+		args[this.index] = value;
 
-		do {
-			while (args[future.index] instanceof Future) {
-				value = args[future.index];
-				if (value.state === STATE_VALUE) {
-					args[future.index] = value.value;
-					continue;
-				}
-				if (value.state === STATE_LISTEN) {
-					addListener(value, setArgument_trace_start, future);
-					return;
-				} else if (value.state === STATE_ERROR) {
-					setError(future, value.value);
-					return;
-				}
-			}
-		} while (++future.index < args.length);
-
-		while (future.index < args.length) {
-			var arg = args[future.index];
-			while (arg instanceof Future) {
-				if (arg.value === STATE_LISTEN) {
-					addListener(arg, setArgument_trace_start, future);
-					return;
-				} else if (arg.state === STATE_VALUE) {
-					arg = arg.value;
-				} else if (arg.state === STATE_ERROR) {
-					setError(future, arg.value);
+		while (++this.index < args.length) {
+			var arg = args[this.index];
+			if (arg instanceof Future) {
+				if (arg.value === STATE_VALUE) {
+					args[this.index] = arg.value;
+				} else if (arg.value === STATE_LISTEN) {
+					arg.addListener(this);
 					return;
 				} else {
-					args[future.index] = arg.value;
+					this.setError(arg);
+					return;
 				}
 			}
 		}
 
 		assert(current === ROOT);
-		current = future;
+		current = this;
 
 		try {
-			value = future.func.apply(future.that, args);
+			value = this.func.apply(this.that, args);
 		} catch (err) {
-			value = new FutureError(future, err);
+			current = ROOT;
+			this.setError(err);
+			return;
 		}
 
 		current = ROOT;
 
 		if (value instanceof Future) {
-			if (value.value === UNRESOLVED) {
-				addListener(value, setValue, future);
+			if (value.state === STATE_LISTEN) {
+				this.receiveValue = this.setValue;
+				value.addListener(this);
 				return;
-			} else {
+			} else if (value.state === STATE_VALUE) {
 				value = value.value;
+			} else {
+				assert(value.state === STATE_ERROR);
+				value.setError(value.value);
 			}
 		}
 
-		setValue(future, value);
-	}
+		this.setValue(value);
+	};
 
-	function invoke_trace_end (func, args, that) {
+	var invoke = function invoke_trace_end (func, args, that) {
 		assert(typeof func === "function" && args instanceof Array);
 
 		var index;
 		for (index = 0; index < args.length; ++index) {
 			var arg = args[index];
-			while (arg instanceof Future) {
+			if (arg instanceof Future) {
 				if (arg.state === STATE_VALUE) {
-					arg = arg.value;
+					args[index] = arg.value;
 				} else if (arg.state === STATE_LISTEN) {
-					args[index] = arg;
 					var future = new FutureInvoke(func, that, args, index);
-					arg.addListener(setArgument_trace_start, future);
+					arg.addListener(future);
 					return future;
 				} else {
 					throw arg.value;
 				}
 			}
-			args[index] = arg;
 		}
 
 		return func.apply(that, args);
-	}
+	};
 
 	// ------- TASYNC -------
 
 	return {
 		Future: Future,
 		delay: delay,
-		invoke: invoke_trace_end
+		invoke: invoke
 	};
 });
