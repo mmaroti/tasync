@@ -19,6 +19,45 @@ define(function () {
 	var STATE_ERROR = 1;
 	var STATE_VALUE = 2;
 
+	var Future = function () {
+		this.state = STATE_LISTEN;
+		this.value = [];
+	};
+
+	Future.prototype.register = function (target) {
+		assert(this.state === STATE_LISTEN);
+		assert(target instanceof Future && target.state === STATE_LISTEN);
+
+		this.value.push(target);
+	};
+
+	Future.prototype.resolve = function (value) {
+		assert(this.state === STATE_LISTEN && !(value instanceof Future));
+
+		var listeners = this.value;
+
+		this.state = STATE_VALUE;
+		this.value = value;
+
+		var i;
+		for (i = 0; i < listeners.length; ++i) {
+			listeners[i].notified(value);
+		}
+	};
+
+	// ------- FutureArray -------
+
+	var FutureArray = function(array, index) {
+		Future.apply(this);
+
+		this.array = array;
+		this.index = index;
+	};
+	
+	FutureArray.prototype = Object.create(Future.prototype);
+	
+	// ------- Future -------
+
 	var Future = function Future_trace_end () {
 		this.state = STATE_LISTEN;
 		this.value = [];
@@ -31,32 +70,7 @@ define(function () {
 		console.log("tasync future", this.getPath());
 	};
 
-	Future.prototype.addListener = function (target) {
-		assert(this.state === STATE_LISTEN);
-		assert(target instanceof Future && target.state === STATE_LISTEN);
-
-		this.value.push(target);
-	};
-
-	Future.prototype.setValue = function (value) {
-		assert(this.state === STATE_LISTEN);
-		assert(!(value instanceof Future) || value.state === STATE_LISTEN);
-
-		console.log("tasync setvalue", this.getPath(), value);
-
-		var listeners = this.value;
-
-		this.state = STATE_VALUE;
-		this.value = value;
-
-		var i = listeners.length;
-		while (--i >= 0) {
-			var listener = listeners[i];
-			listener.receiveValue(value);
-		}
-	};
-
-	Future.prototype.setError = function (error) {
+	Future.prototype.reject = function (error) {
 		assert(this.state === STATE_LISTEN);
 
 		if (!(error instanceof Error)) {
@@ -128,7 +142,7 @@ define(function () {
 		}
 		var future = new Future();
 		setTimeout(function () {
-			future.setValue(value);
+			future.resolve(value);
 		}, timeout);
 		return future;
 	}
@@ -161,7 +175,7 @@ define(function () {
 					arg.addListener(this);
 					return;
 				} else {
-					this.setError(arg);
+					this.reject(arg);
 					return;
 				}
 			}
@@ -174,7 +188,7 @@ define(function () {
 			value = this.func.apply(this.that, args);
 		} catch (err) {
 			current = ROOT;
-			this.setError(err);
+			this.reject(err);
 			return;
 		}
 
@@ -182,18 +196,18 @@ define(function () {
 
 		if (value instanceof Future) {
 			if (value.state === STATE_LISTEN) {
-				this.receiveValue = this.setValue;
+				this.receiveValue = this.resolve;
 				value.addListener(this);
 				return;
 			} else if (value.state === STATE_VALUE) {
-				value = value.value;
+				this.resolve(value.value);
 			} else {
 				assert(value.state === STATE_ERROR);
-				value.setError(value.value);
+				this.reject(value.value);
 			}
+		} else {
+			this.resolve(value);
 		}
-
-		this.setValue(value);
 	};
 
 	var invoke = function invoke_trace_end (func, args, that) {
@@ -210,6 +224,7 @@ define(function () {
 					arg.addListener(future);
 					return future;
 				} else {
+					assert(arg.state === STATE_ERROR);
 					throw arg.value;
 				}
 			}
