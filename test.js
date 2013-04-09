@@ -4,7 +4,7 @@
 
 var requirejs = require("requirejs");
 
-requirejs([ "tasync2" ], function (TA) {
+requirejs([ "tasync" ], function (TA) {
 	"use strict";
 
 	function divide (x, y) {
