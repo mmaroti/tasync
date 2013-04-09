@@ -16,8 +16,8 @@ define(function () {
 	// ------- Future -------
 
 	var STATE_LISTEN = 0;
-	var STATE_ERROR = 1;
-	var STATE_VALUE = 2;
+	var STATE_REJECTED = 1;
+	var STATE_RESOLVED = 2;
 
 	var Future = function () {
 		this.state = STATE_LISTEN;
@@ -36,75 +36,133 @@ define(function () {
 
 		var listeners = this.value;
 
-		this.state = STATE_VALUE;
+		this.state = STATE_RESOLVED;
 		this.value = value;
 
 		var i;
 		for (i = 0; i < listeners.length; ++i) {
-			listeners[i].notified(value);
+			listeners[i].onResolved(value);
 		}
 	};
 
+	Future.prototype.reject = function (error) {
+		assert(this.state === STATE_LISTEN && error instanceof Error);
+
+		var listeners = this.value;
+
+		this.state = STATE_REJECTED;
+		this.value = error;
+
+		var i;
+		for (i = 0; i < listeners.length; ++i) {
+			listeners[i].onRejected(error);
+		}
+	};
+
+	// ------- Delay -------
+
+	function delay (timeout, value) {
+		if (timeout < 0) {
+			return value;
+		}
+
+		var future = new Future();
+		setTimeout(function () {
+			future.resolve(value);
+		}, timeout);
+		return future;
+	}
+
 	// ------- FutureArray -------
 
-	var FutureArray = function(array, index) {
+	var FutureArray = function (array, index) {
 		Future.apply(this);
 
 		this.array = array;
 		this.index = index;
 	};
-	
+
 	FutureArray.prototype = Object.create(Future.prototype);
-	
-	// ------- Future -------
 
-	var Future = function Future_trace_end () {
-		this.state = STATE_LISTEN;
-		this.value = [];
-
-		this.caller = current;
-		this.position = ++current.children;
-		this.children = 0;
-
-		this.trace = new Error();
-		console.log("tasync future", this.getPath());
-	};
-
-	Future.prototype.reject = function (error) {
+	FutureArray.prototype.onResolved = function (value) {
 		assert(this.state === STATE_LISTEN);
 
-		if (!(error instanceof Error)) {
-			error = new Error(error);
-		}
+		var array = this.array;
+		array[this.index] = value;
 
-		if (typeof error.trace !== "string") {
-			var trace = getSlice(error.stack) + "\n";
-
-			var future = this;
-			while (future !== ROOT) {
-				trace += "*** tasync ***\n";
-				trace += getSlice(future.trace.stack);
-				future = future.caller;
+		while (++this.index < array.length) {
+			value = array[this.index];
+			if (value instanceof Future) {
+				if (value.state === STATE_RESOLVED) {
+					array[this.index] = value.value;
+				} else if (value.state === STATE_LISTEN) {
+					value.register(this);
+					return;
+				} else {
+					assert(value.state === STATE_REJECTED);
+					this.reject(value.value);
+					return;
+				}
 			}
-
-			error.trace = trace;
 		}
 
-		console.log("tasync seterror", this.getPath(), error.message);
-
-		var listeners = this.value;
-
-		this.state = STATE_ERROR;
-		this.value = error;
-
-		var i = listeners.length;
-		while (--i >= 0) {
-			var listener = listeners[i];
-			listener.receiveError(error);
-		}
+		this.array = null;
+		this.resolve(array);
 	};
 
-	Future.prototype.getPath = function () {
+	FutureArray.prototype.onRejected = function (error) {
+		this.array = null;
+		this.reject(error);
+	};
+
+	var array = function (array) {
+		assert(array instanceof Array);
+
+		var index;
+		for (index = 0; index < array.length; ++index) {
+			var value = array[index];
+			if (value instanceof Future) {
+				if (value.state === STATE_RESOLVED) {
+					array[index] = value.value;
+				} else if (value.state === STATE_LISTEN) {
+					var future = new FutureArray(array, index);
+					value.register(future);
+					return future;
+				} else {
+					assert(value.state === STATE_REJECTED);
+					throw value.value;
+				}
+			}
+		}
+
+		return array;
+	};
+
+	// ------- FutureInvoke -------
+
+	var ROOT = {
+		subframes: 0
+	};
+
+	var FRAME = ROOT;
+
+	function FutureInvoke (func, that, args, index) {
+		Future.apply(this);
+
+		this.caller = FRAME;
+		this.position = ++FRAME.subframes;
+		this.subframes = 0;
+		this.trace = new Error();
+
+		this.func = func;
+		this.that = that;
+		this.args = args;
+		this.index = index;
+	}
+
+	FutureInvoke.prototype = Object.create(Future.prototype);
+
+	FutureInvoke.prototype.getPath = function () {
 		var future = this, path = [];
 		while (future !== ROOT) {
 			path.push(future.position);
@@ -118,8 +176,11 @@ define(function () {
 
 		var end = trace.indexOf("_trace_start");
 		if (end >= 0) {
-			end = trace.lastIndexOf("\n", end);
+			end = trace.lastIndexOf("\n", end) + 1;
 		} else {
+			if (trace.charAt(trace.length - 1) !== "\n") {
+				trace += "\n";
+			}
 			end = undefined;
 		}
 
@@ -129,80 +190,66 @@ define(function () {
 		return trace.substring(start, end);
 	}
 
-	var ROOT = Object.create(Future.prototype);
-	ROOT.children = 0;
+	FutureInvoke.prototype.onRejected = function (error) {
+		this.args = null;
+		this.reject(error);
+	};
 
-	var current = ROOT;
-
-	// ------- delay -------
-
-	function delay (timeout, value) {
-		if (timeout < 0) {
-			return value;
-		}
-		var future = new Future();
-		setTimeout(function () {
-			future.resolve(value);
-		}, timeout);
-		return future;
-	}
-
-	// ------- invoke -------
-
-	function FutureInvoke (func, that, args, index) {
-		Future.apply(this);
-
-		this.func = func;
-		this.that = that;
-		this.args = args;
-		this.index = index;
-	}
-
-	FutureInvoke.prototype = Object.create(Future.prototype);
-
-	FutureInvoke.prototype.receiveValue = function (value) {
-		assert(!(value instanceof Future));
+	FutureInvoke.prototype.onResolved = function invoke_on_resolved_trace_start (value) {
+		assert(this.state === STATE_LISTEN);
 
 		var args = this.args;
 		args[this.index] = value;
 
 		while (++this.index < args.length) {
-			var arg = args[this.index];
-			if (arg instanceof Future) {
-				if (arg.value === STATE_VALUE) {
-					args[this.index] = arg.value;
-				} else if (arg.value === STATE_LISTEN) {
-					arg.addListener(this);
+			value = args[this.index];
+			if (value instanceof Future) {
+				if (value.state === STATE_RESOLVED) {
+					args[this.index] = value.value;
+				} else if (value.state === STATE_LISTEN) {
+					value.register(this);
 					return;
 				} else {
-					this.reject(arg);
+					assert(value.state === STATE_REJECTED);
+					this.reject(value.value);
 					return;
 				}
 			}
 		}
 
-		assert(current === ROOT);
-		current = this;
+		assert(FRAME === ROOT);
+		FRAME = this;
 
+		this.args = null;
 		try {
 			value = this.func.apply(this.that, args);
-		} catch (err) {
-			current = ROOT;
-			this.reject(err);
+		} catch (error) {
+			FRAME = ROOT;
+
+			value = error instanceof Error ? error : new Error(error);
+
+			value.trace = getSlice(value.stack);
+			var future = this;
+			do {
+				value.trace += "*** callback ***\n";
+				value.trace += getSlice(future.trace.stack);
+				future = future.caller;
+			} while (future !== ROOT);
+
+			this.reject(value);
 			return;
 		}
 
-		current = ROOT;
+		FRAME = ROOT;
 
 		if (value instanceof Future) {
 			if (value.state === STATE_LISTEN) {
-				this.receiveValue = this.resolve;
-				value.addListener(this);
-				return;
-			} else if (value.state === STATE_VALUE) {
+				this.onResolved = this.resolve;
+				value.register(this);
+			} else if (value.state === STATE_RESOLVED) {
 				this.resolve(value.value);
 			} else {
-				assert(value.state === STATE_ERROR);
+				assert(value.state === STATE_REJECTED);
 				this.reject(value.value);
 			}
 		} else {
@@ -215,17 +262,17 @@ define(function () {
 
 		var index;
 		for (index = 0; index < args.length; ++index) {
-			var arg = args[index];
-			if (arg instanceof Future) {
-				if (arg.state === STATE_VALUE) {
-					args[index] = arg.value;
-				} else if (arg.state === STATE_LISTEN) {
+			var value = args[index];
+			if (value instanceof Future) {
+				if (value.state === STATE_RESOLVED) {
+					args[index] = value.value;
+				} else if (value.state === STATE_LISTEN) {
 					var future = new FutureInvoke(func, that, args, index);
-					arg.addListener(future);
+					value.register(future);
 					return future;
 				} else {
-					assert(arg.state === STATE_ERROR);
-					throw arg.value;
+					assert(value.state === STATE_REJECTED);
+					throw value.value;
 				}
 			}
 		}
@@ -233,11 +280,44 @@ define(function () {
 		return func.apply(that, args);
 	};
 
+	// ------- Then -------
+
+	function FutureThen (func, that, value) {
+		FutureInvoke.call(this, func, that, [ null, value ], 1);
+	}
+
+	FutureThen.prototype = Object.create(FutureInvoke.prototype);
+
+	FutureThen.prototype.onRejected = function (error) {
+		this.args[0] = error;
+		this.onResolved(null);
+	};
+
+	function then (value, func, that) {
+		assert(typeof func === "function");
+
+		if (value instanceof Future) {
+			if (value.state === STATE_LISTEN) {
+				var future = new FutureThen(func, that, value);
+				value.register(future);
+				return future;
+			} else if (value.state instanceof STATE_RESOLVED) {
+				return func(null, value.value);
+			} else {
+				assert(value.state === STATE_REJECTED);
+				return func(value.value);
+			}
+		} else {
+			return func(null, value);
+		}
+	}
+
 	// ------- TASYNC -------
 
 	return {
-		Future: Future,
 		delay: delay,
-		invoke: invoke
+		array: array,
+		invoke: invoke,
+		then: then
 	};
 });
