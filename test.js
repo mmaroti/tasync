@@ -16,16 +16,23 @@ requirejs([ "tasync" ], function (TA) {
 
 	function curry (x, y) {
 		y = TA.delay(300, y);
-		return TA.invoke(divide, [ x, y ]);
+		// return TA.invoke(divide, [ x, y ]);
+		return divide.ta_invoke(x, y);
 	}
 
 	function test1 () {
 		var a = TA.delay(100, 1);
 		var b = TA.delay(200, 0);
-		var c = TA.invoke(curry, [ a, b ]);
+		// var c = TA.invoke(curry, [ a, b ]);
+		var c = curry.ta_invoke(a, b);
 
 		TA.then(c, function (error, value) {
-			console.log(error ? error.trace : null, value);
+			if(error) {
+				console.log(error.message);
+//				console.log(error.stack);
+				console.log(error.trace);
+			}
+			console.log(value);
 		});
 	}
 
