@@ -275,84 +275,6 @@ define(function () {
 		return func.apply(that, args);
 	};
 
-	var ta_apply = function ta_apply_trace_end (that, args) {
-		assert(typeof this === "function" && args instanceof Array);
-
-		var index;
-		for (index = 0; index < args.length; ++index) {
-			var value = args[index];
-			if (value instanceof Future) {
-				if (value.state === STATE_RESOLVED) {
-					args[index] = value.value;
-				} else if (value.state === STATE_LISTEN) {
-					var future = new FutureInvoke(this, that, args, index);
-					value.register(future);
-					return future;
-				} else {
-					assert(value.state === STATE_REJECTED);
-					throw value.value;
-				}
-			}
-		}
-
-		return this.apply(that, args);
-	};
-
-	Function.prototype.ta_apply = ta_apply;
-
-	var ARRAY_PROTOTYPE_SLICE = Array.prototype.slice;
-	var FUNCTION_PROTOTYPE_CALL = Function.prototype.call;
-
-	var ta_call = function ta_call_trace_end () {
-		assert(typeof this === "function");
-
-		var index;
-		for (index = 1; index < arguments.length; ++index) {
-			var value = arguments[index];
-			if (value instanceof Future) {
-				if (value.state === STATE_RESOLVED) {
-					arguments[index] = value.value;
-				} else if (value.state === STATE_LISTEN) {
-					var future = new FutureInvoke(this, arguments[0], ARRAY_PROTOTYPE_SLICE.call(arguments, 1), index - 1);
-					value.register(future);
-					return future;
-				} else {
-					assert(value.state === STATE_REJECTED);
-					throw value.value;
-				}
-			}
-		}
-
-		return FUNCTION_PROROTYPE_CALL.apply(this, arguments);
-	};
-
-	Function.prototype.ta_call = ta_call;
-
-	var ta_invoke = function ta_invoke_trace_end () {
-		assert(typeof this === "function");
-
-		var index;
-		for (index = 0; index < arguments.length; ++index) {
-			var value = arguments[index];
-			if (value instanceof Future) {
-				if (value.state === STATE_RESOLVED) {
-					arguments[index] = value.value;
-				} else if (value.state === STATE_LISTEN) {
-					var future = new FutureInvoke(this, null, ARRAY_PROTOTYPE_SLICE.call(arguments), index);
-					value.register(future);
-					return future;
-				} else {
-					assert(value.state === STATE_REJECTED);
-					throw value.value;
-				}
-			}
-		}
-
-		return this.apply(null, arguments);
-	};
-
-	Function.prototype.ta_invoke = ta_invoke;
-
 	// ------- Then -------
 
 	function FutureThen (func, that, value) {
@@ -390,9 +312,8 @@ define(function () {
 	function adapt (func) {
 		assert(typeof func === "function");
 
-		if (func.tasync_unadaped)
-
-			return function () {
+		if (typeof func.tasync_adapted === "undefined") {
+			func.tasync_adapted = function () {
 				var args = arguments;
 				var future = new Future();
 
@@ -415,6 +336,11 @@ define(function () {
 					throw future.value;
 				}
 			};
+
+			func.tasync_adapted.tasync_unadapted = func;
+		}
+
+		return func.tasync_adapted;
 	}
 
 	// ------- Unadapt -------
@@ -434,29 +360,33 @@ define(function () {
 	function unadapt (func) {
 		assert(typeof func === "function");
 
-		func.tasync_unadapted = function () {
-			var args = arguments;
+		if (typeof func.tasync_unadapted === "undefined") {
+			func.tasync_unadapted = function () {
+				var args = arguments;
 
-			var callback = args[--args.length];
-			ASSERT(typeof callback === "function");
+				var callback = args[--args.length];
+				ASSERT(typeof callback === "function");
 
-			var value;
-			try {
-				value = func.apply(this, args);
-			} catch (error) {
-				callback(error);
-				return;
-			}
+				var value;
+				try {
+					value = func.apply(this, args);
+				} catch (error) {
+					callback(error);
+					return;
+				}
 
-			if (value instanceof Future) {
-				assert(value.state === STATE_LISTEN);
+				if (value instanceof Future) {
+					assert(value.state === STATE_LISTEN);
 
-				var listener = new FutureUnadapt(callback);
-				value.register(listener);
-			} else {
-				callback(null, value);
-			}
-		};
+					var listener = new FutureUnadapt(callback);
+					value.register(listener);
+				} else {
+					callback(null, value);
+				}
+			};
+
+			func.tasync_unadapted.tasync_adapted = func;
+		}
 
 		return func.tasync_unadapted;
 	}
