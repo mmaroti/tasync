@@ -34,7 +34,7 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 
 				list.forEach(function (filename) {
 					var filepath = dir + "/" + filename;
-					FS.stat(filepath, function (err, stat) {
+					FS.lstat(filepath, function (err, stat) {
 						if (err) {
 							finish(err);
 						} else if (stat.isDirectory()) {
@@ -50,9 +50,46 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 		});
 	};
 
+	var serial = function (dir, done) {
+		FS.readdir(dir, function (err, list) {
+			if (err) {
+				done(err);
+			} else {
+				var sum = 0, index = -1;
+
+				var next = function (err, count) {
+					if (err) {
+						done(err);
+					} else {
+						sum += count;
+						if (++index >= list.length) {
+							done(null, sum);
+						} else {
+							var filename = list[index];
+							var filepath = dir + "/" + filename;
+							FS.lstat(filepath, function (err, stat) {
+								if (err) {
+									done(err);
+								} else if (stat.isDirectory()) {
+									serial(filepath, next);
+								} else if (filename.indexOf(pattern) >= 0) {
+									next(null, 1);
+								} else {
+									next(null, 0);
+								}
+							});
+						}
+					}
+				};
+
+				next(null, 0);
+			}
+		});
+	};
+
 	var tasync = (function () {
 		var FS_READDIR = TA.adapt(FS.readdir);
-		var FS_STAT = TA.adapt(FS.stat);
+		var FS_STAT = TA.adapt(FS.lstat);
 
 		function readDir (dir) {
 			var futureList = FS_READDIR(dir);
@@ -94,6 +131,8 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 	if (typeof startdir === "string" && startdir.length >= 1 && typeof pattern === "string" && pattern.length >= 1) {
 		if (method === "parallel") {
 			method = parallel;
+		} else if (method === "serial") {
+			method = serial;
 		} else if (method === "tasync") {
 			method = tasync;
 		}
@@ -109,6 +148,6 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 			console.timeEnd("elapsed time");
 		});
 	} else {
-		console.log("Usage: node testfs.js [parallel,tasync] startdir pattern");
+		console.log("Usage: node testfs.js [parallel,serial,tasync] startdir pattern");
 	}
 });
