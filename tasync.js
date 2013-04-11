@@ -5,6 +5,8 @@
 define(function () {
 	"use strict";
 
+	var ENABLE_TASYNC_TRACE = false;
+
 	// ------- assert -------
 
 	function assert (cond) {
@@ -152,7 +154,10 @@ define(function () {
 		this.caller = FRAME;
 		this.position = ++FRAME.subframes;
 		this.subframes = 0;
-		this.trace = new Error();
+
+		if (ENABLE_TASYNC_TRACE) {
+			this.trace = new Error();
+		}
 
 		this.func = func;
 		this.that = that;
@@ -228,13 +233,15 @@ define(function () {
 
 			value = error instanceof Error ? error : new Error(error);
 
-			value.trace = getSlice(value.stack);
-			var future = this;
-			do {
-				value.trace += "*** callback ***\n";
-				value.trace += getSlice(future.trace.stack);
-				future = future.caller;
-			} while (future !== ROOT);
+			if (ENABLE_TASYNC_TRACE) {
+				value.trace = getSlice(value.stack);
+				var future = this;
+				do {
+					value.trace += "*** callback ***\n";
+					value.trace += getSlice(future.trace.stack);
+					future = future.caller;
+				} while (future !== ROOT);
+			}
 
 			this.reject(value);
 			return;

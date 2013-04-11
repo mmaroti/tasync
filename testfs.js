@@ -10,20 +10,25 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 	var method = process.argv[2];
 	var startdir = process.argv[3];
 	var pattern = process.argv[4];
-	var count = 0;
 
-	function parallel (dir, done) {
+	var parallel = function (dir, done) {
 		FS.readdir(dir, function (err, list) {
 			if (err) {
-				console.log(err);
-				done();
+				done(err);
 			} else if (list.length === 0) {
-				done();
+				done(null, 0);
 			} else {
-				var pending = list.length;
-				var finish = function () {
-					if (--pending === 0) {
-						done();
+				var sum = 0, pending = list.length;
+
+				var finish = function (err, count) {
+					if (err && pending > 0) {
+						pending = 0;
+						done(err);
+					} else {
+						sum += count;
+						if (--pending === 0) {
+							done(null, sum);
+						}
 					}
 				};
 
@@ -31,64 +36,74 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 					var filepath = dir + "/" + filename;
 					FS.stat(filepath, function (err, stat) {
 						if (err) {
-							console.log(err);
+							finish(err);
 						} else if (stat.isDirectory()) {
 							parallel(filepath, finish);
-							return;
 						} else if (filename.indexOf(pattern) >= 0) {
-							count++;
+							finish(null, 1);
+						} else {
+							finish(null, 0);
 						}
-						finish();
 					});
 				});
 			}
 		});
-	}
+	};
 
-	var FS_READDIR = TA.adapt(FS.readdir);
-	var FS_STAT = TA.adapt(FS.stat);
+	var tasync = (function () {
+		var FS_READDIR = TA.adapt(FS.readdir);
+		var FS_STAT = TA.adapt(FS.stat);
 
-	function tasync_1 (dir) {
-		var list = FS_READDIR(dir);
-		return TA.invoke(tasync_2, [ dir, list ]);
-	}
-
-	function tasync_2 (dir, list) {
-		var i = 0;
-		for (i = 0; i < list.length; ++i) {
-			var filename = list[i];
-			var filepath = dir + "/" + filename;
-			var stat = FS_STAT(filepath);
-			list[i] = TA.invoke(tasync_3, [ filename, filepath, stat ]);
+		function readDir (dir) {
+			var futureList = FS_READDIR(dir);
+			return TA.invoke(processDir, [ dir, futureList ]);
 		}
-		return TA.invoke(tasync_4, list);
-	}
 
-	function tasync_3 (filename, filepath, stat) {
-		if (stat.isDirectory()) {
-			return TA.invoke(tasync_1, [ filepath ]);
-		} else if (filename.indexOf(pattern) >= 0) {
-			++count;
+		function processDir (dir, list) {
+			var i = 0;
+			for (i = 0; i < list.length; ++i) {
+				var filename = list[i];
+				var filepath = dir + "/" + filename;
+				var futureStat = FS_STAT(filepath);
+				list[i] = TA.invoke(processFile, [ filename, filepath, futureStat ]);
+			}
+			return TA.invoke(sum, list);
 		}
-	}
 
-	function tasync_4 () {
-//		throw new Error();
-	}
+		function processFile (filename, filepath, stat) {
+			if (stat.isDirectory()) {
+				return readDir(filepath);
+			} else if (filename.indexOf(pattern) >= 0) {
+				return 1;
+			} else {
+				return 0;
+			}
+		}
+
+		function sum () {
+			var i, s = 0;
+			for (i = 0; i < arguments.length; ++i) {
+				s += arguments[i];
+			}
+			return s;
+		}
+
+		return TA.unadapt(readDir);
+	})();
 
 	if (typeof startdir === "string" && startdir.length >= 1 && typeof pattern === "string" && pattern.length >= 1) {
 		if (method === "parallel") {
 			method = parallel;
 		} else if (method === "tasync") {
-			method = TA.unadapt(tasync_1);
+			method = tasync;
 		}
 	}
 
 	if (typeof method === "function") {
 		console.time("elapsed time");
-		method(startdir, function (err) {
-			if(err) {
-				console.log(err.trace);
+		method(startdir, function (err, count) {
+			if (err) {
+				console.log(err);
 			}
 			console.log("found " + count + " files");
 			console.timeEnd("elapsed time");
