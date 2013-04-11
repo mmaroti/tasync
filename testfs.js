@@ -73,6 +73,7 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 	}
 
 	function tasync_4 () {
+//		throw new Error();
 	}
 
 	if (typeof startdir === "string" && startdir.length >= 1 && typeof pattern === "string" && pattern.length >= 1) {
@@ -85,7 +86,10 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 
 	if (typeof method === "function") {
 		console.time("elapsed time");
-		method(startdir, function () {
+		method(startdir, function (err) {
+			if(err) {
+				console.log(err.trace);
+			}
 			console.log("found " + count + " files");
 			console.timeEnd("elapsed time");
 		});
