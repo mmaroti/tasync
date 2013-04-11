@@ -27,15 +27,15 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 					}
 				};
 
-				list.forEach(function (file) {
-					var filepath = dir + "/" + file;
+				list.forEach(function (filename) {
+					var filepath = dir + "/" + filename;
 					FS.stat(filepath, function (err, stat) {
 						if (err) {
 							console.log(err);
 						} else if (stat.isDirectory()) {
 							parallel(filepath, finish);
 							return;
-						} else if (file.indexOf(pattern) >= 0) {
+						} else if (filename.indexOf(pattern) >= 0) {
 							count++;
 						}
 						finish();
@@ -45,9 +45,41 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 		});
 	}
 
+	var FS_READDIR = TA.adapt(FS.readdir);
+	var FS_STAT = TA.adapt(FS.stat);
+
+	function tasync_1 (dir) {
+		var list = FS_READDIR(dir);
+		return TA.invoke(tasync_2, [ dir, list ]);
+	}
+
+	function tasync_2 (dir, list) {
+		var i = 0;
+		for (i = 0; i < list.length; ++i) {
+			var filename = list[i];
+			var filepath = dir + "/" + filename;
+			var stat = FS_STAT(filepath);
+			list[i] = TA.invoke(tasync_3, [ filename, filepath, stat ]);
+		}
+		return TA.invoke(tasync_4, list);
+	}
+
+	function tasync_3 (filename, filepath, stat) {
+		if (stat.isDirectory()) {
+			return TA.invoke(tasync_1, [ filepath ]);
+		} else if (filename.indexOf(pattern) >= 0) {
+			++count;
+		}
+	}
+
+	function tasync_4 () {
+	}
+
 	if (typeof startdir === "string" && startdir.length >= 1 && typeof pattern === "string" && pattern.length >= 1) {
 		if (method === "parallel") {
 			method = parallel;
+		} else if (method === "tasync") {
+			method = TA.unadapt(tasync_1);
 		}
 	}
 
@@ -58,6 +90,6 @@ requirejs([ "tasync", "fs" ], function (TA, FS) {
 			console.timeEnd("elapsed time");
 		});
 	} else {
-		console.log("Usage: node testfs.js [parallel] startdir pattern");
+		console.log("Usage: node testfs.js [parallel,tasync] startdir pattern");
 	}
 });

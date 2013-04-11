@@ -26,7 +26,7 @@ define(function () {
 
 	Future.prototype.register = function (target) {
 		assert(this.state === STATE_LISTEN);
-		assert(target instanceof Future && target.state === STATE_LISTEN);
+		assert(typeof target === "object" && target != null);
 
 		this.value.push(target);
 	};
@@ -365,7 +365,7 @@ define(function () {
 				var args = arguments;
 
 				var callback = args[--args.length];
-				ASSERT(typeof callback === "function");
+				assert(typeof callback === "function");
 
 				var value;
 				try {
