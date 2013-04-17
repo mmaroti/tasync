@@ -4,7 +4,7 @@
 
 var requirejs = require("requirejs");
 
-requirejs([ "tasync", "fs" ], function (TA, FS) {
+requirejs([ "../lib/tasync", "fs" ], function (TA, FS) {
 	"use strict";
 
 	var method = process.argv[2];

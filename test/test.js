@@ -1,38 +1,32 @@
-/**
- * Copyright (c) 2013, Miklos Maroti
- */
+"use strict";
 
-var requirejs = require("requirejs");
+var TA = require("../lib/tasync");
 
-requirejs([ "tasync" ], function (TA) {
-	"use strict";
+function divide (x, y) {
+	if (y === 0) {
+		throw new Error("divide by zero");
+	}
+	return x / y;
+}
 
-	function divide (x, y) {
-		if (y === 0) {
-			throw new Error("divide by zero");
+function curry (x, y) {
+	y = TA.delay(300, y);
+	return TA.invoke(divide, [ x, y ]);
+}
+
+function test1 () {
+	var a = TA.delay(100, 1);
+	var b = TA.delay(200, 0);
+	var c = TA.invoke(curry, [ a, b ]);
+
+	TA.then(c, function (error, value) {
+		if (error) {
+			console.log(error.message);
+			//				console.log(error.stack);
+			console.log(error.trace);
 		}
-		return x / y;
-	}
+		console.log(value);
+	});
+}
 
-	function curry (x, y) {
-		y = TA.delay(300, y);
-		return TA.invoke(divide, [ x, y ]);
-	}
-
-	function test1 () {
-		var a = TA.delay(100, 1);
-		var b = TA.delay(200, 0);
-		var c = TA.invoke(curry, [ a, b ]);
-
-		TA.then(c, function (error, value) {
-			if(error) {
-				console.log(error.message);
-//				console.log(error.stack);
-				console.log(error.trace);
-			}
-			console.log(value);
-		});
-	}
-
-	test1();
-});
+test1();
