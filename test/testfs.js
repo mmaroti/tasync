@@ -4,12 +4,11 @@
 
 var requirejs = require("requirejs");
 
-requirejs([ "../lib/tasync", "fs" ], function (TA, FS) {
+requirejs([ "../lib/tasync", "fs" ], function (TASYNC, FS) {
 	"use strict";
 
-	var method = process.argv[2];
-	var startdir = process.argv[3];
-	var pattern = process.argv[4];
+	var startdir = process.argv[2];
+	var pattern = process.argv[3];
 
 	var parallel = function (dir, done) {
 		FS.readdir(dir, function (err, list) {
@@ -87,13 +86,15 @@ requirejs([ "../lib/tasync", "fs" ], function (TA, FS) {
 		});
 	};
 
+	TASYNC.setTrace(false);
+	
 	var tasync = (function () {
-		var FS_READDIR = TA.adapt(FS.readdir);
-		var FS_STAT = TA.adapt(FS.lstat);
+		var FS_READDIR = TASYNC.adapt(FS.readdir);
+		var FS_STAT = TASYNC.adapt(FS.lstat);
 
 		function readDir (dir) {
 			var futureList = FS_READDIR(dir);
-			return TA.invoke(processDir, [ dir, futureList ]);
+			return TASYNC.invoke(processDir, [ dir, futureList ]);
 		}
 
 		function processDir (dir, list) {
@@ -102,9 +103,9 @@ requirejs([ "../lib/tasync", "fs" ], function (TA, FS) {
 				var filename = list[i];
 				var filepath = dir + "/" + filename;
 				var futureStat = FS_STAT(filepath);
-				list[i] = TA.invoke(processFile, [ filename, filepath, futureStat ]);
+				list[i] = TASYNC.invoke(processFile, [ filename, filepath, futureStat ]);
 			}
-			return TA.invoke(sum, list);
+			return TASYNC.invoke(sum, list);
 		}
 
 		function processFile (filename, filepath, stat) {
@@ -125,29 +126,39 @@ requirejs([ "../lib/tasync", "fs" ], function (TA, FS) {
 			return s;
 		}
 
-		return TA.unadapt(readDir);
+		return TASYNC.unadapt(readDir);
 	})();
 
-	if (typeof startdir === "string" && startdir.length >= 1 && typeof pattern === "string" && pattern.length >= 1) {
-		if (method === "parallel") {
-			method = parallel;
-		} else if (method === "serial") {
-			method = serial;
-		} else if (method === "tasync") {
-			method = tasync;
-		}
+	if (typeof startdir !== "string" || typeof pattern !== "string") {
+		console.log("Usage: node testfs.js startdir pattern");
+		return;
 	}
 
-	if (typeof method === "function") {
-		console.time("elapsed time");
-		method(startdir, function (err, count) {
-			if (err) {
-				console.log(err);
-			}
-			console.log("found " + count + " files");
-			console.timeEnd("elapsed time");
-		});
-	} else {
-		console.log("Usage: node testfs.js [parallel,serial,tasync] startdir pattern");
+	var methods = {
+		parallel: parallel,
+		serial: serial,
+		tasync: tasync
+	};
+
+	var test = function (name, next) {
+		return function () {
+			var elapsed = Date.now();
+			methods[name](startdir, function (error, result) {
+				elapsed = Date.now() - elapsed;
+				name = name + new Array(17 - name.length).join(" ");
+				console.log(name + (error || result) + "\t" + elapsed + " ms");
+				next();
+			});
+		};
+	};
+
+	var next = function () {
+	};
+
+	var name;
+	for (name in methods) {
+		next = test(name, next);
 	}
+
+	next();
 });
