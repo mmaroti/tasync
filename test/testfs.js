@@ -90,7 +90,7 @@ var tasync = (function () {
 
 	function readDir (dir) {
 		var futureList = fsReadDir(dir);
-		return TASYNC.invoke(processDir, [ dir, futureList ]);
+		return TASYNC.apply(processDir, [ dir, futureList ]);
 	}
 
 	function processDir (dir, list) {
@@ -99,9 +99,9 @@ var tasync = (function () {
 			var filename = list[i];
 			var filepath = dir + "/" + filename;
 			var futureStat = fsStat(filepath);
-			list[i] = TASYNC.invoke(processFile, [ filename, filepath, futureStat ]);
+			list[i] = TASYNC.apply(processFile, [ filename, filepath, futureStat ]);
 		}
-		return TASYNC.invoke(sum, list);
+		return TASYNC.apply(sum, list);
 	}
 
 	function processFile (filename, filepath, stat) {
@@ -131,7 +131,7 @@ var tasync2 = (function () {
 
 	function readDir (dir) {
 		var futureList = fsReadDir(dir);
-		return TASYNC.invoke(processDir, [ futureList, dir ]);
+		return TASYNC.apply(processDir, [ futureList, dir ]);
 	}
 
 	function processDir (list, dir) {
@@ -140,9 +140,9 @@ var tasync2 = (function () {
 			var filename = list[i];
 			var filepath = dir + "/" + filename;
 			var futureStat = fsStat(filepath);
-			list[i] = TASYNC.invoke(processFile, [ filename, filepath, futureStat ]);
+			list[i] = TASYNC.apply(processFile, [ filename, filepath, futureStat ]);
 		}
-		return TASYNC.invoke(sum, list);
+		return TASYNC.apply(sum, list);
 	}
 
 	function processFile (filename, filepath, stat) {
@@ -172,7 +172,7 @@ var throttled = (function () {
 
 	function readDir (dir) {
 		var futureList = fsReadDir(dir);
-		return TASYNC.invoke(processDir, [ dir, futureList ]);
+		return TASYNC.apply(processDir, [ dir, futureList ]);
 	}
 
 	function processDir (dir, list) {
@@ -181,9 +181,9 @@ var throttled = (function () {
 			var filename = list[i];
 			var filepath = dir + "/" + filename;
 			var futureStat = fsStat(filepath);
-			list[i] = TASYNC.invoke(processFile, [ filename, filepath, futureStat ]);
+			list[i] = TASYNC.apply(processFile, [ filename, filepath, futureStat ]);
 		}
-		return TASYNC.invoke(sum, list);
+		return TASYNC.apply(sum, list);
 	}
 
 	function processFile (filename, filepath, stat) {

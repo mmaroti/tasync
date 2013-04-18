@@ -12,7 +12,7 @@ function test () {
 
 	var a = TASYNC.delay(100, 1);
 	var b = TASYNC.delay(200, 0);
-	var c = TASYNC.invoke(divide, [ a, b ]);
+	var c = TASYNC.apply(divide, [ a, b ]);
 
 	TASYNC.then(c, function (error, value) {
 		console.log(error && (error.trace || error.stack));
