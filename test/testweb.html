@@ -2,7 +2,7 @@
 <html>
 <head>
 	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
-	<title>TASYNC testing</title>
+	<title>TASYNC test</title>
 	<script src="http://requirejs.org/docs/release/2.1.5/minified/require.js"></script>
 </head>
 <body>
@@ -24,25 +24,24 @@ TASYNC.then(c, function (error, value) {
 </pre>
 <pre style="color:red" id="error"></pre>
 <script>
-	require(["http://raw.github.com/mmaroti/tasync/master/lib/tasync.js"], function(TASYNC) {
-		function divide (x, y) {
-			if (y === 0) {
-				throw new Error("divide by zero");
-			}
-			return x / y;
+require(["../lib/tasync.js"], function(TASYNC) {
+	function divide (x, y) {
+		if (y === 0) {
+			throw new Error("divide by zero");
 		}
+		return x / y;
+	}
 
-		var a = TASYNC.delay(100, 1);
-		var b = TASYNC.delay(200, 0);
-		var c = TASYNC.apply(divide, [ a, b ]);
+	var a = TASYNC.delay(100, 1);
+	var b = TASYNC.delay(200, 0);
+	var c = TASYNC.apply(divide, [ a, b ]);
 
-		TASYNC.then(c, function (error, value) {
-			var text = error.trace;
-			text = text.replace(/\n/g, "<br/>");
-			var par = document.getElementById("error");
-			par.innerHTML = text;
-		});
+	TASYNC.then(c, function (error, value) {
+		var text = error.trace;
+		text = text.replace(/\n/g, "<br/>");
+		document.getElementById("error").innerHTML = text;
 	});
+});
 </script>
 </body>
 </html>
