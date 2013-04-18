@@ -1,0 +1,48 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+	<title>TASYNC testing</title>
+	<script src="http://requirejs.org/docs/release/2.1.5/minified/require.js"></script>
+</head>
+<body>
+<pre style="color:blue">
+function divide (x, y) {
+	if (y === 0) {
+		throw new Error("divide by zero");
+	}
+	return x / y;
+}
+
+var a = TASYNC.delay(100, 1);
+var b = TASYNC.delay(200, 0);
+var c = TASYNC.apply(divide, [ a, b ]);
+
+TASYNC.then(c, function (error, value) {
+	console.log(error.trace);
+});
+</pre>
+<pre style="color:red" id="error"></pre>
+<script>
+	require(["http://raw.github.com/mmaroti/tasync/master/lib/tasync.js"], function(TASYNC) {
+		function divide (x, y) {
+			if (y === 0) {
+				throw new Error("divide by zero");
+			}
+			return x / y;
+		}
+
+		var a = TASYNC.delay(100, 1);
+		var b = TASYNC.delay(200, 0);
+		var c = TASYNC.apply(divide, [ a, b ]);
+
+		TASYNC.then(c, function (error, value) {
+			var text = error.trace;
+			text = text.replace(/\n/g, "<br/>");
+			var par = document.getElementById("error");
+			par.innerHTML = text;
+		});
+	});
+</script>
+</body>
+</html>
