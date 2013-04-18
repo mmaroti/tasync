@@ -32,10 +32,9 @@ In this example we crate two future values (`a` and `b`) that become
 available in 100 and 200 ms, then invoke the divide function which
 will throw an exception. The future result of the division is
 stored in `c`. When this value becomes available then we display the
-error trace on the console. Running this in node.js you should see
-a stack trace similar to this where line 15 would be pointing to the
-variable assignment to `c` and line 8 would point to the `throw` 
-statement.
+error trace on the console. Running this in node.js will display
+a stack trace where line 15 would be pointing to the variable 
+assignment to `c` and line 8 would point to the `throw` statement.
 
 ```
 Error: divide by zero
@@ -87,5 +86,4 @@ is done through `TASYNC.apply` since it has a parameter that is potentially
 a future object. The `TASYNC.apply` call returns immediatelly, creating a
 new future that will be set when the `updateCache` call is eventually
 completed. Finally, we turn our future returning function `cachedReadFile`
-into a regular callback based method with `TASYNC.unadapt`.
- 
+into a regular callback based one and monkey patch `FS.readFile`. 
