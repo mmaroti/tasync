@@ -125,8 +125,49 @@ var tasync = (function () {
 	return TASYNC.unadapt(readDir);
 })();
 
+var tasync2 = (function () {
+	var fsReadDir = TASYNC.adapt(FS.readdir);
+	var fsStat = TASYNC.adapt(FS.lstat);
+
+	function readDir (dir) {
+		var futureList = fsReadDir(dir);
+		return TASYNC.invoke(processDir, [ futureList, dir ]);
+	}
+
+	function processDir (list, dir) {
+		var i = 0;
+		for (i = 0; i < list.length; ++i) {
+			var filename = list[i];
+			var filepath = dir + "/" + filename;
+			var futureStat = fsStat(filepath);
+			list[i] = TASYNC.invoke(processFile, [ filename, filepath, futureStat ]);
+		}
+		return TASYNC.invoke(sum, list);
+	}
+
+	function processFile (filename, filepath, stat) {
+		if (stat.isDirectory()) {
+			return readDir(filepath);
+		} else if (filename.indexOf(pattern) >= 0) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	function sum () {
+		var i, s = 0;
+		for (i = 0; i < arguments.length; ++i) {
+			s += arguments[i];
+		}
+		return s;
+	}
+
+	return TASYNC.unadapt(readDir);
+})();
+
 var throttled = (function () {
-	var fsReadDir = TASYNC.throttle(TASYNC.adapt(FS.readdir), 10);
+	var fsReadDir = TASYNC.throttle(TASYNC.adapt(FS.readdir), 5);
 	var fsStat = TASYNC.adapt(FS.lstat);
 
 	function readDir (dir) {
@@ -175,9 +216,10 @@ if (typeof startdir !== "string" || typeof pattern !== "string") {
 
 var methods = {
 	throttled: throttled,
+//	tasync2: tasync2,
 	tasync: tasync,
-	parallel: parallel,
-	serial: serial
+	parallel: parallel
+//	serial: serial
 };
 
 var test = function (name, next) {
