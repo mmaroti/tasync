@@ -3,8 +3,7 @@
 var TASYNC = require("../lib/tasync");
 var FS = require("fs");
 
-var startdir = process.argv[2];
-var pattern = process.argv[3];
+var pattern = ".js";
 
 var parallel = function (dir, done) {
 	FS.readdir(dir, function (err, list) {
@@ -131,16 +130,16 @@ var tasync2 = (function () {
 
 	function readDir (dir) {
 		var futureList = fsReadDir(dir);
-		return TASYNC.apply(processDir, [ futureList, dir ]);
+		return TASYNC.call(processDir, dir, futureList);
 	}
 
-	function processDir (list, dir) {
+	function processDir (dir, list) {
 		var i = 0;
 		for (i = 0; i < list.length; ++i) {
 			var filename = list[i];
 			var filepath = dir + "/" + filename;
 			var futureStat = fsStat(filepath);
-			list[i] = TASYNC.apply(processFile, [ filename, filepath, futureStat ]);
+			list[i] = TASYNC.call(processFile, filename, filepath, futureStat);
 		}
 		return TASYNC.apply(sum, list);
 	}
@@ -209,14 +208,15 @@ var throttled = (function () {
 
 // ------- main
 
-if (typeof startdir !== "string" || typeof pattern !== "string") {
-	console.log("Usage: node testfs.js startdir pattern");
+var startdir = process.argv[2];
+if (typeof startdir !== "string") {
+	console.log("Usage: node testfs.js startdir");
 	return;
 }
 
 var methods = {
 	throttled: throttled,
-//	tasync2: tasync2,
+	tasync2: tasync2,
 	tasync: tasync,
 	parallel: parallel
 //	serial: serial
@@ -231,7 +231,7 @@ var test = function (name, next) {
 			console.log(name + elapsed + " ms\t\t" + (error || result));
 
 			if (error) {
-				// console.log(error.stack);
+				console.log(error.trace || error.stack);
 			}
 			next();
 		});
