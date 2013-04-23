@@ -11,12 +11,12 @@ unique features:
 
 I use this library to work with a large database backend, where most objects
 are cached in memory. In this scenario you do not want to use regular 
-callbacks, because either you call callbacks before methods return and then
-you run out of stack space, or you return with `nexttick` which kills the
-performance. Also, traversing an extremely large tree asynchronously is hard:
-if you do it serially (depth first) then it is slow, if you do it parallel
-(breadth first) then you run out of memory, so you need a combination of
-the two. This (and much more) can be accomplished with the `throttle`
+callbacks, because either you call the callbacks before the methods return 
+and then you run out of stack space, or you return with `nexttick` which kills
+the performance. Also, traversing an extremely large tree asynchronously is 
+hard: if you do it serially (depth first) then it is slow, if you do it 
+parallel (breadth first) then you run out of memory, so you need a combination 
+of the two. This (and much more) can be accomplished with the `throttle`
 functionality provided by this library.
 
 ## Stack trace example
@@ -104,9 +104,9 @@ into a regular callback based one and monkey patch `FS.readFile`.
 
 Many functions potentially return future objects. You should never
 call methods on these objects, nor should you test for them. Instead,
-you should use `apply` or `call` to call further functions when these
-potential future objects get resolved. Throwing of exceptions are
-encouraged and are properly handled throughout the library.  
+use `apply` or `call` to call further functions when these potential 
+future objects get resolved. Throwing of exceptions are encouraged and
+are properly handled throughout the library.  
 
 ## delay(timeout, value)
 
