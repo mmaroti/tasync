@@ -13,7 +13,7 @@ var FS = require("fs");
 		}
 
 		var futureFileData = fsReadFile(fileName);
-		return TASYNC.apply(updateCache, [ fileName, futureFileData ]);
+		return TASYNC.call(updateCache, fileName, futureFileData);
 	}
 
 	function updateCache (fileName, fileData) {

@@ -19,11 +19,13 @@ function divide (x, y) {
 	return x / y;
 }
 
-var a = TASYNC.delay(100, 1);
-var b = TASYNC.delay(200, 0);
-var c = TASYNC.apply(divide, [ a, b ]);
+function test() {
+	var a = TASYNC.delay(100, 1);
+	var b = TASYNC.delay(200, 0);
+	return TASYNC.call(divide, a, b);
+}
 
-TASYNC.then(c, function (error, value) {
+TASYNC.trycatch(test, function (error) {
 	console.log(error.trace);
 });
 ```
@@ -31,23 +33,23 @@ TASYNC.then(c, function (error, value) {
 In this example we crate two future values (`a` and `b`) that become 
 available in 100 and 200 ms, then invoke the divide function which
 will throw an exception. The future result of the division is
-stored in `c`. When this value becomes available then we display the
-error trace on the console. Running this in node.js will display
-a stack trace where line 15 would be pointing to the variable 
-assignment to `c` and line 8 would point to the `throw` statement.
+return from the `test` function. When this value becomes available 
+then we display the error trace on the console. Running this in node.js
+ ill display a stack trace where line 15 would be pointing to the return 
+statement and line 7 would point to the `throw` statement.
 
 ```
 Error: divide by zero
-    at divide (~/tasync/test/teststack.js:8:10)
+    at divide (~/tasync/test/teststack.js:7:9)
 *** callback ***
-    at test (~/tasync/test/teststack.js:15:17)
-    at Object.<anonymous> (~/tasync/test/teststack.js:23:1)
+    at test (~/tasync/test/teststack.js:15:16)
+    at Object.trycatch (~/tasync/lib/tasync.js:435:16)
+    at Object.<anonymous> (~/tasync/test/teststack.js:18:8)
     at Module._compile (module.js:441:26)
     at Object..js (module.js:459:10)
     at Module.load (module.js:348:32)
     at Function._load (module.js:308:12)
     at Array.0 (module.js:479:10)
-    at EventEmitter._tickCallback (node.js:192:41)
 ```
 
 ## Caching example
@@ -62,7 +64,7 @@ function cachedReadFile (fileName) {
 	}
 
 	var futureFileData = fsReadFile(fileName);
-	return TASYNC.apply(updateCache, [ fileName, futureFileData ]);
+	return TASYNC.call(updateCache, fileName, futureFileData);
 }
 
 function updateCache (fileName, fileData) {

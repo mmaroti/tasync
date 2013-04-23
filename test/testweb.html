@@ -14,11 +14,13 @@ function divide (x, y) {
 	return x / y;
 }
 
-var a = TASYNC.delay(100, 1);
-var b = TASYNC.delay(200, 0);
-var c = TASYNC.apply(divide, [ a, b ]);
+function test() {
+	var a = TASYNC.delay(100, 1);
+	var b = TASYNC.delay(200, 0);
+	return TASYNC.call(divide, a, b);
+}
 
-TASYNC.then(c, function (error, value) {
+TASYNC.trycatch(test, function (error) {
 	console.log(error.trace);
 });
 </pre>
@@ -32,11 +34,13 @@ require(["../lib/tasync.js"], function(TASYNC) {
 		return x / y;
 	}
 
-	var a = TASYNC.delay(100, 1);
-	var b = TASYNC.delay(200, 0);
-	var c = TASYNC.apply(divide, [ a, b ]);
+	function test() {
+		var a = TASYNC.delay(100, 1);
+		var b = TASYNC.delay(200, 0);
+		return TASYNC.call(divide, a, b);
+	}
 
-	TASYNC.then(c, function (error, value) {
+	TASYNC.trycatch(test, function (error) {
 		var text = error.trace;
 		text = text.replace(/\n/g, "<br/>");
 		document.getElementById("error").innerHTML = text;
