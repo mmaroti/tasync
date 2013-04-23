@@ -35,8 +35,8 @@ available in 100 and 200 ms, then invoke the divide function which
 will throw an exception. The future result of the division is
 return from the `test` function. When this value becomes available 
 then we display the error trace on the console. Running this in node.js
- ill display a stack trace where line 15 would be pointing to the return 
-statement and line 7 would point to the `throw` statement.
+will display the following stack trace where line 15 is the return
+statement and line 7 is the `throw` statement.
 
 ```
 Error: divide by zero
