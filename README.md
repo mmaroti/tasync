@@ -92,10 +92,10 @@ into a regular callback based one and monkey patch `FS.readFile`.
 
 # Documentation
 
-Many functions are potentially returns future objects. You should never
+Many functions potentially return future objects. You should never
 call methods on these objects, nor should you test for them. Instead,
 you should use `apply` or `call` to call further functions when these
-potential future objects gets resolved. 
+potential future objects get resolved. 
 
 ## delay(timeout, value)
 
@@ -114,7 +114,7 @@ arguments are futures that are rejected, then the the returned future will
 become rejected with the same error. If all arguments are available (regular
 value, or a rejected or resolved future), then `func` will be called
 immediately and thus this method can return a regular value or throw an
-exception.  
+exception, as well.
 
 ## call(func, arg1, ..., argn)
 
@@ -123,10 +123,10 @@ Same as `apply(func, [arg1,...,argn], null)`.
 ##  adapt(func)
 
 Takes a node.js style asynchronous function `func` which should be called 
-with a callback as a last argument, and turns it into a function that returns
+with a callback at the last argument, and turns it into a function that returns
 futures. In particular, if `func` calls the callback before returning, then
 the new function will return a regular object or throws an exception, 
-otherwise it will return a future object then will be eventually resolved or
+otherwise it will return a future object which will be eventually resolved or
 rejected.
 
 ## unadapt(func)
@@ -140,8 +140,8 @@ Calls the `func()` function with no parameters. If `func` throws an error or
 returns a future that is eventually rejected, then `handler(error)` is called.
 The result of the method will be the result of `func()` if no error occurs,
 or the result of `handler(error)` if an error is detected. The `error` object
-passed to `handle` is an instance of `Error` and has an `error.trace` field
-that tracks the function calls across asynchronous calls.
+passed to `handle` is an instance of `Error` and has an extra `error.trace` 
+field that tracks the function calls across asynchronous calls.
 
 ## lift(array)
 
@@ -157,5 +157,12 @@ function which takes the same set of arguments, but ensues that no more than
 `limit` number of instances of `func` are currently running. If this limit
 is reached, then further calls of `func` are delayed until one of the
 running instances returns. This method chooses that outstanding call to
-run next which is earliest in a logical time ordering (i.e. the one
+run next which is earliest in the logical time ordering (i.e. the one
 that would be called fist if all asynchronous calls were blocking).
+
+## join(first, second)
+
+Returns `first`, when both `first` and `second` are resolved. If one of 
+them are rejected, then that error is returned in the future. Both `first`
+and `second` can be regular objects, so this method may return a regular
+object, throw an error, or return a future.   
