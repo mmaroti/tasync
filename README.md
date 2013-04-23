@@ -33,10 +33,10 @@ TASYNC.trycatch(test, function (error) {
 In this example we crate two future values (`a` and `b`) that become 
 available in 100 and 200 ms, then invoke the divide function which
 will throw an exception. The future result of the division is
-return from the `test` function. When this value becomes available 
-then we display the error trace on the console. Running this in node.js
-will display the following stack trace where line 15 is the return
-statement and line 7 is the `throw` statement.
+returned from the `test` function. When this value becomes available, 
+we display the error trace on the console. Running this in node.js
+will display the following stack trace where line 15 is pointing to
+the return statement and line 7 to the `throw` statement.
 
 ```
 Error: divide by zero
@@ -95,7 +95,8 @@ into a regular callback based one and monkey patch `FS.readFile`.
 Many functions potentially return future objects. You should never
 call methods on these objects, nor should you test for them. Instead,
 you should use `apply` or `call` to call further functions when these
-potential future objects get resolved. 
+potential future objects get resolved. Throwing of exceptions are
+encouraged and are properly handled throughout the library.  
 
 ## delay(timeout, value)
 
