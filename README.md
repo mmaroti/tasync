@@ -9,6 +9,16 @@ unique features:
 * real and future values can be mixed freely
 * execution can be throttled in logical execution time
 
+I use this library to work with a large database backend, where most objects
+are cached in memory. In this scenario you do not want to use regular 
+callbacks, because either you call callbacks before methods return and then
+you run out of stack space, or you return with `nexttick` which kills the
+performance. Also, traversing an extremely large tree asynchronously is hard:
+if you do it serially (depth first) then it is slow, if you do it parallel
+(breadth first) then you run out of memory, so you need a combination of
+the two. This (and much more) can be accomplished with the `throttle`
+functionality provided by this library.
+
 ## Stack trace example
 
 ```javascript
@@ -84,8 +94,8 @@ based method `FS.readFile` into a method that returns futures `fsReadFile`.
 Notice, that in `cachedReadFile` we either going to return a regular value
 or a future value. We can call `fsReadFile` directly, because we are sure
 that all parameters are regular values. However, the call to `updateCache`
-is done through `TASYNC.apply` since it has a parameter that is potentially
-a future object. The `TASYNC.apply` call returns immediately, creating a
+is done through `TASYNC.call` since it has a parameter that is potentially
+a future object. The `TASYNC.call` returns immediately, creating a
 new future that will be set when the `updateCache` call is eventually
 completed. Finally, we turn our future returning function `cachedReadFile`
 into a regular callback based one and monkey patch `FS.readFile`. 
