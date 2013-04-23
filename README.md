@@ -85,7 +85,77 @@ Notice, that in `cachedReadFile` we either going to return a regular value
 or a future value. We can call `fsReadFile` directly, because we are sure
 that all parameters are regular values. However, the call to `updateCache`
 is done through `TASYNC.apply` since it has a parameter that is potentially
-a future object. The `TASYNC.apply` call returns immediatelly, creating a
+a future object. The `TASYNC.apply` call returns immediately, creating a
 new future that will be set when the `updateCache` call is eventually
 completed. Finally, we turn our future returning function `cachedReadFile`
 into a regular callback based one and monkey patch `FS.readFile`. 
+
+# Documentation
+
+Many functions are potentially returns future objects. You should never
+call methods on these objects, nor should you test for them. Instead,
+you should use `apply` or `call` to call further functions when these
+potential future objects gets resolved. 
+
+## delay(timeout, value)
+
+Returns a future value which will be resolved to `value` after `timeout` 
+milliseconds. If `timeout` is negative, then `value` is returned 
+immediately.
+
+## apply(func, args, [that])
+
+Calls the `func` function with the `args` array of arguments on the optional
+`that` object. If one of the arguments is an unresolved future value, then
+this method returns a new future value that will be resolved when all 
+arguments are resolved and the `func` function is returned. You can chain
+futures, that is, `func` can return a future value as well. If any of the
+arguments are futures that are rejected, then the the returned future will
+become rejected with the same error. If all arguments are available (regular
+value, or a rejected or resolved future), then `func` will be called
+immediately and thus this method can return a regular value or throw an
+exception.  
+
+## call(func, arg1, ..., argn)
+
+Same as `apply(func, [arg1,...,argn], null)`.
+
+##  adapt(func)
+
+Takes a node.js style asynchronous function `func` which should be called 
+with a callback as a last argument, and turns it into a function that returns
+futures. In particular, if `func` calls the callback before returning, then
+the new function will return a regular object or throws an exception, 
+otherwise it will return a future object then will be eventually resolved or
+rejected.
+
+## unadapt(func)
+
+Takes a function that returns futures, and turns it into a node.js 
+asynchronous function that takes a callback as the last parameter.
+
+## trycatch(func, handler)
+
+Calls the `func()` function with no parameters. If `func` throws an error or 
+returns a future that is eventually rejected, then `handler(error)` is called.
+The result of the method will be the result of `func()` if no error occurs,
+or the result of `handler(error)` if an error is detected. The `error` object
+passed to `handle` is an instance of `Error` and has an `error.trace` field
+that tracks the function calls across asynchronous calls.
+
+## lift(array)
+
+Takes an array `array` of values and/or futures, and returns a future value 
+that will be resolved to an array of values when all embedded futures are 
+resolved. If one of the embedded futures is rejected, then the returned 
+future is also rejected.
+
+## throttle(func, limit)
+
+Takes a function `func` that returns futures and turns it into another 
+function which takes the same set of arguments, but ensues that no more than
+`limit` number of instances of `func` are currently running. If this limit
+is reached, then further calls of `func` are delayed until one of the
+running instances returns. This method chooses that outstanding call to
+run next which is earliest in a logical time ordering (i.e. the one
+that would be called fist if all asynchronous calls were blocking).

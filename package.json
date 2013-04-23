@@ -1,8 +1,9 @@
 {
   "name": "tasync",
-  "version": "0.0.1",
-  "description": "Time-aware async programming library",
+  "version": "0.1.0",
+  "description": "Time-aware async programming library (stack traces across callbacks)",
   "author": "Miklos Maroti <mmaroti@gmail.com>",
+  "main": "lib/tasync"
   "homepage": "http://github.com/mmaroti/tasync",
   "repository": {
     "type": "git",
@@ -11,15 +12,9 @@
   "bugs": {
     "url": "http://github.com/mmaroti/tasync/issues"
   },
-  "licenses": [
-    { 
-      "type": "MIT",
-      "url": "http://github.com/mmaroti/tasync/raw/master/LICENSE"
-    } 
-  ],
+  "license": "MIT",
   "dependencies": {},
   "devDependencies": {},
-  "optionalDependencies": {},
   "engines": {
     "node": "*"
   }
