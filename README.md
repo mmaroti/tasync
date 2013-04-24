@@ -155,15 +155,16 @@ var fsReadDir = TASYNC.throttle(TASYNC.adapt(FS.readdir), 5);
  
 then you limit the number of concurrently executing FS.readdir calls to
 5. Moreover importantly, when we select the next FS.readdir to be called, 
-you select the directory whose name is the smallest in a lexicographical 
-order. This means, that you are approximating a serial (depth first search)
+you select the directory whose name is the smallest in lexicographical 
+order. This means, that you are approximating a serial (depth first) search
 but still perform up to 5 parallel calls. All of this is done by maintaining
-a tree order of the outstanding futures where the lexicographical order
-is the logical time order of execution if your code would be running
+a tree of the outstanding futures where the lexicographical order
+is the logical time order of execution assuming your code is running
 sequentially.
 
-Running serial, parallel, tasync, and throttled tasync versions of this
-program with hot caches we get the following execution times on `/usr/lib`:
+Running the serial, parallel, original tasync, and throttled tasync versions 
+of this program with hot caches we get the following execution times for
+the directory `/usr/lib`:
 
 ```
 serial          996 ms
@@ -172,8 +173,8 @@ tasync          348 ms
 throttled       320 ms
 ``` 
 
-With cold caches (type `echo 1 > /proc/sys/vm/drop_caches`), then the 
-throttled becomes the fastest:
+With cold caches (`echo 1 > /proc/sys/vm/drop_caches`), then the 
+throttled version becomes the fastest:
 
 ```
 serial          5680 ms
