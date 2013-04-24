@@ -12,7 +12,7 @@ unique features:
 I use this library to work with a large database backend, where most objects
 are cached in memory. In this scenario you do not want to use regular 
 callbacks, because either you call the callbacks before the methods return 
-and then you run out of stack space, or you return with `nexttick` which kills
+and then you run out of stack space, or you use `nextTick` which kills
 the performance. Also, traversing an extremely large tree asynchronously is 
 hard: if you do it serially (depth first) then it is slow, if you do it 
 parallel (breadth first) then you run out of memory, so you need a combination 
@@ -99,6 +99,88 @@ a future object. The `TASYNC.call` returns immediately, creating a
 new future that will be set when the `updateCache` call is eventually
 completed. Finally, we turn our future returning function `cachedReadFile`
 into a regular callback based one and monkey patch `FS.readFile`. 
+
+## Throttle example
+
+```
+var fsReadDir = TASYNC.adapt(FS.readdir);
+var fsStat = TASYNC.adapt(FS.lstat);
+
+function readDir (dir) {
+	var futureList = fsReadDir(dir);
+	return TASYNC.call(processDir, dir, futureList);
+}
+
+function processDir (dir, list) {
+	for (var i = 0; i < list.length; ++i) {
+		var filename = list[i];
+		var filepath = dir + "/" + filename;
+		var futureStat = fsStat(filepath);
+		list[i] = TASYNC.call(processFile, filename, filepath, futureStat);
+	}
+	return TASYNC.apply(sum, list);
+}
+
+function processFile (filename, filepath, stat) {
+	if (stat.isDirectory()) {
+		return readDir(filepath);
+	} else if (filename.indexOf(".js", filename.length - 3) !== -1) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+function sum () {
+	var s = 0;
+	for (var i = 0; i < arguments.length; ++i) {
+		s += arguments[i];
+	}
+	return s;
+}
+```
+
+In this example the function `readDir(dir)` will search the given directory
+recursively and returns the number of javascript files found. The code is
+quite easy to follow (try to write the same with regular callbacks) and
+essentially performs a breadth first search. If you run this (or the 
+equivalent code with callbacks) on a really really large directory, then
+you are going to run out of memory since you are creating potentially as
+many continuation as the largest breadth of your tree. If you replace
+the first line with this
+
+```
+var fsReadDir = TASYNC.throttle(TASYNC.adapt(FS.readdir), 5);
+```
+ 
+then you limit the number of concurrently executing FS.readdir calls to
+5. Moreover importantly, when we select the next FS.readdir to be called, 
+you select the directory whose name is the smallest in a lexicographical 
+order. This means, that you are approximating a serial (depth first search)
+but still perform up to 5 parallel calls. All of this is done by maintaining
+a tree order of the outstanding futures where the lexicographical order
+is the logical time order of execution if your code would be running
+sequentially.
+
+Running serial, parallel, tasync, and throttled tasync versions of this
+program with hot caches we get the following execution times on `/usr/lib`:
+
+```
+serial          996 ms
+parallel        244 ms
+tasync          348 ms
+throttled       320 ms
+``` 
+
+With cold caches (type `echo 1 > /proc/sys/vm/drop_caches`), then the 
+throttled becomes the fastest:
+
+```
+serial          5680 ms
+parallel        6533 ms
+tasync          6540 ms
+throttled       4975 ms
+```
 
 # Documentation
 

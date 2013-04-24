@@ -2,8 +2,7 @@
 
 var TASYNC = require("../lib/tasync");
 var FS = require("fs");
-
-var pattern = ".js";
+var ext = ".js";
 
 var parallel = function (dir, done) {
 	FS.readdir(dir, function (err, list) {
@@ -33,7 +32,7 @@ var parallel = function (dir, done) {
 						finish(err);
 					} else if (stat.isDirectory()) {
 						parallel(filepath, finish);
-					} else if (filename.indexOf(pattern) >= 0) {
+					} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
 						finish(null, 1);
 					} else {
 						finish(null, 0);
@@ -66,7 +65,7 @@ var serial = function (dir, done) {
 								done(err);
 							} else if (stat.isDirectory()) {
 								serial(filepath, next);
-							} else if (filename.indexOf(pattern) >= 0) {
+							} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
 								next(null, 1);
 							} else {
 								next(null, 0);
@@ -81,50 +80,10 @@ var serial = function (dir, done) {
 	});
 };
 
+// disable stack tracing 
 TASYNC.setTrace(false);
 
 var tasync = (function () {
-	var fsReadDir = TASYNC.adapt(FS.readdir);
-	var fsStat = TASYNC.adapt(FS.lstat);
-
-	function readDir (dir) {
-		var futureList = fsReadDir(dir);
-		return TASYNC.apply(processDir, [ dir, futureList ]);
-	}
-
-	function processDir (dir, list) {
-		var i = 0;
-		for (i = 0; i < list.length; ++i) {
-			var filename = list[i];
-			var filepath = dir + "/" + filename;
-			var futureStat = fsStat(filepath);
-			list[i] = TASYNC.apply(processFile, [ filename, filepath, futureStat ]);
-		}
-		return TASYNC.apply(sum, list);
-	}
-
-	function processFile (filename, filepath, stat) {
-		if (stat.isDirectory()) {
-			return readDir(filepath);
-		} else if (filename.indexOf(pattern) >= 0) {
-			return 1;
-		} else {
-			return 0;
-		}
-	}
-
-	function sum () {
-		var i, s = 0;
-		for (i = 0; i < arguments.length; ++i) {
-			s += arguments[i];
-		}
-		return s;
-	}
-
-	return TASYNC.unadapt(readDir);
-})();
-
-var tasync2 = (function () {
 	var fsReadDir = TASYNC.adapt(FS.readdir);
 	var fsStat = TASYNC.adapt(FS.lstat);
 
@@ -147,7 +106,7 @@ var tasync2 = (function () {
 	function processFile (filename, filepath, stat) {
 		if (stat.isDirectory()) {
 			return readDir(filepath);
-		} else if (filename.indexOf(pattern) >= 0) {
+		} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
 			return 1;
 		} else {
 			return 0;
@@ -171,7 +130,7 @@ var throttled = (function () {
 
 	function readDir (dir) {
 		var futureList = fsReadDir(dir);
-		return TASYNC.apply(processDir, [ dir, futureList ]);
+		return TASYNC.call(processDir, dir, futureList);
 	}
 
 	function processDir (dir, list) {
@@ -180,7 +139,7 @@ var throttled = (function () {
 			var filename = list[i];
 			var filepath = dir + "/" + filename;
 			var futureStat = fsStat(filepath);
-			list[i] = TASYNC.apply(processFile, [ filename, filepath, futureStat ]);
+			list[i] = TASYNC.call(processFile, filename, filepath, futureStat);
 		}
 		return TASYNC.apply(sum, list);
 	}
@@ -188,7 +147,7 @@ var throttled = (function () {
 	function processFile (filename, filepath, stat) {
 		if (stat.isDirectory()) {
 			return readDir(filepath);
-		} else if (filename.indexOf(pattern) >= 0) {
+		} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
 			return 1;
 		} else {
 			return 0;
@@ -216,9 +175,8 @@ if (typeof startdir !== "string") {
 
 var methods = {
 	throttled: throttled,
-	tasync2: tasync2,
-	tasync: tasync,
-	parallel: parallel
+//	tasync: tasync,
+//	parallel: parallel,
 //	serial: serial
 };
 
