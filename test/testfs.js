@@ -32,10 +32,8 @@ var parallel = function (dir, done) {
 						finish(err);
 					} else if (stat.isDirectory()) {
 						parallel(filepath, finish);
-					} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
-						finish(null, 1);
 					} else {
-						finish(null, 0);
+						finish(null, filename.indexOf(ext, filename.length - ext.length) !== -1 ? 1 : 0);
 					}
 				});
 			});
@@ -65,10 +63,8 @@ var serial = function (dir, done) {
 								done(err);
 							} else if (stat.isDirectory()) {
 								serial(filepath, next);
-							} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
-								next(null, 1);
 							} else {
-								next(null, 0);
+								next(null, filename.indexOf(ext, filename.length - ext.length) !== -1 ? 1 : 0);
 							}
 						});
 					}
@@ -106,10 +102,8 @@ var tasync = (function () {
 	function processFile (filename, filepath, stat) {
 		if (stat.isDirectory()) {
 			return readDir(filepath);
-		} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
-			return 1;
 		} else {
-			return 0;
+			return filename.indexOf(ext, filename.length - ext.length) !== -1 ? 1 : 0;
 		}
 	}
 
@@ -147,10 +141,8 @@ var throttled = (function () {
 	function processFile (filename, filepath, stat) {
 		if (stat.isDirectory()) {
 			return readDir(filepath);
-		} else if (filename.indexOf(ext, filename.length - ext.length) !== -1) {
-			return 1;
 		} else {
-			return 0;
+			return filename.indexOf(ext, filename.length - ext.length) !== -1 ? 1 : 0;
 		}
 	}
 
@@ -175,9 +167,9 @@ if (typeof startdir !== "string") {
 
 var methods = {
 	throttled: throttled,
-//	tasync: tasync,
-//	parallel: parallel,
-//	serial: serial
+	tasync: tasync,
+	parallel: parallel,
+	serial: serial
 };
 
 var test = function (name, next) {

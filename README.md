@@ -124,10 +124,8 @@ function processDir (dir, list) {
 function processFile (filename, filepath, stat) {
 	if (stat.isDirectory()) {
 		return readDir(filepath);
-	} else if (filename.indexOf(".js", filename.length - 3) !== -1) {
-		return 1;
 	} else {
-		return 0;
+		return filename.indexOf(ext, filename.length - ext.length) !== -1 ? 1 : 0;
 	}
 }
 
