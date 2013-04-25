@@ -22,6 +22,8 @@ functionality provided by this library.
 ## Stack trace example
 
 ```javascript
+var TASYNC = require("tasync");
+
 function divide (x, y) {
 	if (y === 0) {
 		throw new Error("divide by zero");
@@ -102,7 +104,7 @@ into a regular callback based one and monkey patch `FS.readFile`.
 
 ## Throttle example
 
-```
+```javascript
 var fsReadDir = TASYNC.adapt(FS.readdir);
 var fsStat = TASYNC.adapt(FS.lstat);
 
