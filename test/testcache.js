@@ -4,7 +4,7 @@ var TASYNC = require("../lib/tasync");
 var FS = require("fs");
 
 (function () {
-	var fsReadFile = TASYNC.adapt(FS.readFile);
+	var fsReadFile = TASYNC.wrap(FS.readFile);
 	var lastFileName, lastFileData;
 
 	function cachedReadFile (fileName) {
@@ -23,7 +23,7 @@ var FS = require("fs");
 		return fileData;
 	}
 
-	FS.readFile = TASYNC.unadapt(cachedReadFile);
+	FS.readFile = TASYNC.unwrap(cachedReadFile);
 }());
 
 // --- test

@@ -67,7 +67,7 @@ Error: divide by zero
 ## Caching example
 
 ```javascript
-var fsReadFile = TASYNC.adapt(FS.readFile);
+var fsReadFile = TASYNC.wrap(FS.readFile);
 var lastFileName, lastFileData;
 
 function cachedReadFile (fileName) {
@@ -86,7 +86,7 @@ function updateCache (fileName, fileData) {
 	return fileData;
 }
 
-FS.readFile = TASYNC.unadapt(cachedReadFile);
+FS.readFile = TASYNC.unwrap(cachedReadFile);
 ```
 
 In this example we monkey patch the node.js `FS.readFile` method to cache
@@ -105,8 +105,8 @@ into a regular callback based one and monkey patch `FS.readFile`.
 ## Throttle example
 
 ```javascript
-var fsReadDir = TASYNC.adapt(FS.readdir);
-var fsStat = TASYNC.adapt(FS.lstat);
+var fsReadDir = TASYNC.wrap(FS.readdir);
+var fsStat = TASYNC.wrap(FS.lstat);
 
 function readDir (dir) {
 	var futureList = fsReadDir(dir);
@@ -150,7 +150,7 @@ many continuation as the largest breadth of your tree. If you replace
 the first line with this
 
 ```
-var fsReadDir = TASYNC.throttle(TASYNC.adapt(FS.readdir), 5);
+var fsReadDir = TASYNC.throttle(TASYNC.wrap(FS.readdir), 5);
 ```
  
 then you limit the number of concurrently executing FS.readdir calls to
@@ -214,7 +214,7 @@ exception, as well.
 
 Same as `apply(func, [arg1,...,argn], null)`.
 
-##  adapt(func)
+##  wrap(func)
 
 Takes a node.js style asynchronous function `func` which should be called 
 with a callback at the last argument, and turns it into a function that returns
@@ -223,7 +223,7 @@ the new function will return a regular object or throws an exception,
 otherwise it will return a future object which will be eventually resolved or
 rejected.
 
-## unadapt(func)
+## unwrap(func)
 
 Takes a function that returns futures, and turns it into a node.js 
 asynchronous function that takes a callback as the last parameter.

@@ -80,8 +80,8 @@ var serial = function (dir, done) {
 TASYNC.setTrace(false);
 
 var tasync = (function () {
-	var fsReadDir = TASYNC.adapt(FS.readdir);
-	var fsStat = TASYNC.adapt(FS.lstat);
+	var fsReadDir = TASYNC.wrap(FS.readdir);
+	var fsStat = TASYNC.wrap(FS.lstat);
 
 	function readDir (dir) {
 		var futureList = fsReadDir(dir);
@@ -115,12 +115,12 @@ var tasync = (function () {
 		return s;
 	}
 
-	return TASYNC.unadapt(readDir);
+	return TASYNC.unwrap(readDir);
 })();
 
 var throttled = (function () {
-	var fsReadDir = TASYNC.throttle(TASYNC.adapt(FS.readdir), 5);
-	var fsStat = TASYNC.adapt(FS.lstat);
+	var fsReadDir = TASYNC.throttle(TASYNC.wrap(FS.readdir), 5);
+	var fsStat = TASYNC.wrap(FS.lstat);
 
 	function readDir (dir) {
 		var futureList = fsReadDir(dir);
@@ -154,7 +154,7 @@ var throttled = (function () {
 		return s;
 	}
 
-	return TASYNC.unadapt(readDir);
+	return TASYNC.unwrap(readDir);
 })();
 
 // ------- main
