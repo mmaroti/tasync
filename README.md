@@ -91,7 +91,7 @@ FS.readFile = TASYNC.unwrap(cachedReadFile);
 
 In this example we monkey patch the node.js `FS.readFile` method to cache
 the last result and return that (with an extra end line character at the
-end) at subsequent calls with the same file name. we first turn a callback
+end) at subsequent calls with the same file name. We first turn a callback
 based method `FS.readFile` into a method that returns futures `fsReadFile`.
 Notice, that in `cachedReadFile` we either going to return a regular value
 or a future value. We can call `fsReadFile` directly, because we are sure
@@ -185,9 +185,9 @@ throttled       4975 ms
 
 # Documentation
 
-Many functions potentially return future objects. You should never
-call methods on these objects, nor should you test for them. Instead,
-use `apply` or `call` to call further functions when these potential 
+Most TAsync functions potentially return future objects. You should never
+call methods on these futures, nor should you test for them. Instead,
+use `apply` or `call` to invoke further functions when these potential 
 future objects get resolved. Throwing of exceptions are encouraged and
 are properly handled throughout the library.  
 
@@ -204,11 +204,10 @@ Calls the `func` function with the `args` array of arguments on the optional
 this method returns a new future value that will be resolved when all 
 arguments are resolved and the `func` function is returned. You can chain
 futures, that is, `func` can return a future value as well. If any of the
-arguments are futures that are rejected, then the the returned future will
-become rejected with the same error. If all arguments are available (regular
+arguments are futures that are rejected, then the returned future will
+be rejected with the same error. If all arguments are available (regular
 value, or a rejected or resolved future), then `func` will be called
-immediately and thus this method can return a regular value or throw an
-exception, as well.
+immediately and a regular value is returned or an exception is thrown. 
 
 ## call(func, arg1, ..., argn)
 
@@ -219,7 +218,7 @@ Same as `apply(func, [arg1,...,argn], null)`.
 Takes a node.js style asynchronous function `func` which should be called 
 with a callback at the last argument, and turns it into a function that returns
 futures. In particular, if `func` calls the callback before returning, then
-the new function will return a regular object or throws an exception, 
+the new function will return a regular object or throw an exception, 
 otherwise it will return a future object which will be eventually resolved or
 rejected.
 
@@ -230,9 +229,9 @@ asynchronous function that takes a callback as the last parameter.
 
 ## trycatch(func, handler)
 
-Calls the `func()` function with no parameters. If `func` throws an error or 
+Calls the `func` function with no parameters. If `func` throws an error or 
 returns a future that is eventually rejected, then `handler(error)` is called.
-The result of the method will be the result of `func()` if no error occurs,
+The result of the method will be the result of `func` if no error occurs,
 or the result of `handler(error)` if an error is detected. The `error` object
 passed to `handle` is an instance of `Error` and has an extra `error.trace` 
 field that tracks the function calls across asynchronous calls.
@@ -242,7 +241,7 @@ field that tracks the function calls across asynchronous calls.
 Takes an array `array` of values and/or futures, and returns a future value 
 that will be resolved to an array of values when all embedded futures are 
 resolved. If one of the embedded futures is rejected, then the returned 
-future is also rejected.
+future will also be rejected.
 
 ## throttle(func, limit)
 
