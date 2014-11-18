@@ -1,12 +1,12 @@
 {
   "name": "tasync",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Time-aware async programming library (stack traces across callbacks)",
   "author": "Miklos Maroti <mmaroti@gmail.com>",
   "main": "lib/tasync",
   "homepage": "http://github.com/mmaroti/tasync",
   "keywords": [
-    "asynchronous", 
+    "asynchronous",
     "promise",
     "future",
     "control",
