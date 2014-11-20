@@ -173,7 +173,7 @@ tasync          348 ms
 throttled       320 ms
 ```
 
-With cold caches (`echo 1 > /proc/sys/vm/drop_caches`), then the
+With cold caches (`sudo sh -c "echo 1 > /proc/sys/vm/drop_caches"`), then the
 throttled version becomes the fastest:
 
 ```
@@ -247,7 +247,7 @@ future will also be rejected.
 
 Takes a function `func` that returns futures and turns it into another
 function which takes the same set of arguments, but ensues that no more than
-`limit` number of instances of `func` are currently running. If this limit
+`limit` number of instances of `func` are concurrently running. If this limit
 is reached, then further calls of `func` are delayed until one of the
 running instances returns. This method chooses that outstanding call to
 run next which is earliest in the logical time ordering (i.e. the one
@@ -259,3 +259,8 @@ Returns `first`, when both `first` and `second` are resolved. If one of
 them are rejected, then that error is returned in the future. Both `first`
 and `second` can be regular objects, so this method may return a regular
 object, throw an error, or return a future.
+
+## setTrace(false)
+
+Disables stack tracing across asynchronous calls. This makes the library
+slighly faster by omitting the creation of an extra object in each future.
